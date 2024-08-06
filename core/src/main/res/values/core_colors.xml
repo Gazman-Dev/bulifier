@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="core_black">#FF000000</color>
+    <color name="core_white">#FFFFFFFF</color>
+    <color name="core_debug_color">#4CAF50</color>
+    <color name="core_colorPrimary">#6750A4</color>
+    <color name="core_colorPrimaryDark">#44356A</color>
+    <color name="core_colorAccent">#8019B8</color>
+
+</resources>
