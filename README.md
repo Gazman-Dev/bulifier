@@ -1,5 +1,7 @@
 # Bulifier
 
+*watch demo on [YouTube](https://youtu.be/r4CRRmyYLLY)*
+
 Bulifier is an innovative open-source project that aims to transform software development by leveraging AI and introducing a new intermediary language based on bullet points. It's designed to bridge the gap between human logic and AI-generated code, potentially moving development from laptops to mobile devices.
 
 ## Core Concepts
