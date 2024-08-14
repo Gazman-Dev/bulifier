@@ -42,7 +42,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
     }
 
     private val folderNamePattern by lazy {
-        Regex("^[a-zA-Z0-9]+$")
+        Regex("^[a-zA-Z0-9/.]+$")
     }
 
     private val callback by lazy {
@@ -76,13 +76,10 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         binding.toolbar.jobs.setOnClickListener {
             findNavController().navigate(R.id.aiHistoryFragment)
         }
-        binding.bottomBar.bullify.setOnClickListener {
-            historyViewModel.bulifyPath(viewModel.fullPath.value?.path ?: "")
-            findNavController().navigate(R.id.aiHistoryFragment)
-        }
-
-        binding.bottomBar.debulify.setOnClickListener {
-            historyViewModel.debulifyPath(viewModel.fullPath.value?.path ?: "")
+        binding.bottomBar.ai.setOnClickListener {
+            viewModel.fullPath.value?.run {
+                historyViewModel.callAi(path, content?.fileName)
+            }
             findNavController().navigate(R.id.aiHistoryFragment)
         }
 
@@ -125,9 +122,11 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                     index == 0 || pathParts.size < 2 -> {
                         viewModel.updatePath("")
                     }
+
                     index == pathParts.size - 1 -> {
                         // ignore
                     }
+
                     else -> {
                         viewModel.updatePath(pathParts.subList(1, index + 1).joinToString("/"))
                     }

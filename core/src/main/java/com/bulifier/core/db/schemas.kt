@@ -10,7 +10,6 @@ import androidx.room.ProvidedTypeConverter
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
-import androidx.room.migration.Migration
 import com.bulifier.core.prefs.Prefs
 import java.lang.Long.parseLong
 import java.util.Date
@@ -79,12 +78,17 @@ class SetConverter {
 }
 
 @Entity(tableName = "projects", indices = [Index(value = ["project_id"], unique = true)])
+@TypeConverters(DateTypeConverter::class)
 data class Project(
     @PrimaryKey(autoGenerate = true)
     @ColumnInfo(name = "project_id")
     val projectId: Long = 0,
+
     @ColumnInfo(name = "project_name")
-    val projectName: String
+    val projectName: String,
+
+    @ColumnInfo(name = "last_updated")
+    var lastUpdated: Date = Date()
 )
 
 @Entity(tableName = "schemas", indices = [Index(value = ["schema_name"])])
@@ -222,6 +226,9 @@ data class HistoryItem(
     @ColumnInfo(name = "path")
     val path: String,
 
+    @ColumnInfo(name = "file_name")
+    val fileName: String?,
+
     @ColumnInfo(name = "project_id")
     val projectId: Long = Prefs.projectId.value!!,
 
@@ -233,7 +240,8 @@ data class HistoryItem(
 
     companion object{
         const val SCHEMA_BULLIFY = "bulify"
-        const val SCHEMA_DEBULLIFY = "debulify"
+        const val SCHEMA_DEBULIFY = "debulify"
+        const val SCHEMA_REBULIFY_FILE = "rebulify-file"
     }
 }
 
@@ -271,7 +279,7 @@ data class ResponseItem(
 
 enum class HistoryStatus {
     PROMPTING,
-    SUBMITTED,
-    RESPONDED,
+    SUBMITTED, // loading
+    RESPONDED, // completed
     ERROR
 }

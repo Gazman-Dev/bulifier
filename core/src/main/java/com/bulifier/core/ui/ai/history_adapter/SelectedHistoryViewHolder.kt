@@ -190,6 +190,8 @@ class SelectedHistoryViewHolder(
         bindToolbar(binding.toolbar, historyItem)
         updateChatBox(historyItem)
 
+        binding.prompt.path.text = historyItem?.path
+
         binding.prompt.discardButton.text = when (historyItem?.status) {
             HistoryStatus.RESPONDED, HistoryStatus.ERROR -> {
                 "Logs"

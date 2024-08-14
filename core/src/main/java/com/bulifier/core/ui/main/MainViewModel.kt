@@ -82,8 +82,8 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val content = db.getContent(file.fileId) ?: FileData(
                 fileId = file.fileId,
-                fileName = "",
-                path = path.value ?: "",
+                fileName = file.fileName,
+                path = file.path,
                 content = "",
                 type = Content.Type.NONE
             )
@@ -114,7 +114,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun createProject(projectName: String) {
-        val projectId = db.fetchProjects(Project(projectName = projectName))
+        val projectId = db.insertProject(Project(projectName = projectName))
         withContext(Dispatchers.Main) {
             Prefs.projectId.set(projectId)
             Prefs.projectName.set(projectName)
@@ -153,14 +153,20 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val projectId = projectId.value ?: return@launch
             val path = path.value ?: return@launch
-            db.insertFileAndUpdateParent(
-                File(
-                    fileName = folderName,
-                    projectId = projectId,
-                    isFile = false,
-                    path = path
+            val extraPathParts = mutableListOf<String>()
+            val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
+            folderName.split("[^a-zA-Z0-9]".toRegex()).forEach {
+                db.insertFileAndUpdateParent(
+                    File(
+                        fileName = it,
+                        projectId = projectId,
+                        isFile = false,
+                        path = (pathParts + extraPathParts).joinToString("/")
+                    )
                 )
-            )
+                extraPathParts += it
+            }
+            updatePath((pathParts + extraPathParts).joinToString("/"))
         }
     }
 

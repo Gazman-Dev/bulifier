@@ -1,6 +1,7 @@
 package com.bulifier.core.api
 
 import androidx.lifecycle.LifecycleService
+import androidx.lifecycle.LiveData
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.db.Content
 import com.bulifier.core.db.File
@@ -12,6 +13,7 @@ import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
 import com.bulifier.core.models.QuestionsModel
+import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.schemas.SchemaModel.KEY_BULLET_FILE
 import com.bulifier.core.schemas.SchemaModel.KEY_CONTEXT
 import com.bulifier.core.schemas.SchemaModel.KEY_PACKAGE
@@ -28,7 +30,8 @@ class AiService : LifecycleService() {
 
     override fun onCreate() {
         super.onCreate()
-        db.historyDao().getHistory().observe(this) {
+
+        val observer: (value: List<HistoryItem>) -> Unit = {
             it.forEach { historyItem ->
                 if (historyItem.modelId == null) {
                     lifecycleScope.launch {
@@ -46,20 +49,27 @@ class AiService : LifecycleService() {
                         }
                         try {
                             process(historyItem, filesContext)
-                        }
-                        catch (e: Exception) {
+                        } catch (e: Exception) {
                             e.printStackTrace()
-                            db.historyDao().markError(historyItem.promptId, e.message ?: "Unknown error")
+                            db.historyDao()
+                                .markError(historyItem.promptId, e.message ?: "Unknown error")
                         }
                     }
                 }
             }
         }
+        var historyByStatus: LiveData<List<HistoryItem>>? = null
+        Prefs.projectId.observe(this) {
+            historyByStatus?.removeObserver(observer)
+            historyByStatus =
+                db.historyDao().getHistoryByStatus(status = HistoryStatus.SUBMITTED, projectId = it)
+            historyByStatus?.observe(this, observer)
+        }
     }
 
     private suspend fun process(historyItem: HistoryItem, filesContext: List<FileData>) {
         when (historyItem.schema.lowercase()) {
-            HistoryItem.SCHEMA_DEBULLIFY -> {
+            HistoryItem.SCHEMA_DEBULIFY -> {
                 handleDebulify(historyItem)
             }
 
@@ -67,7 +77,40 @@ class AiService : LifecycleService() {
                 handleBulify(filesContext, historyItem)
             }
 
+            HistoryItem.SCHEMA_REBULIFY_FILE -> {
+                handleRebulifyFile(filesContext, historyItem)
+            }
+
             else -> throw Error("Unknown schema ${historyItem.schema}")
+        }
+    }
+
+    private suspend fun handleRebulifyFile(filesContext: List<FileData>, historyItem: HistoryItem) = withContext(Dispatchers.IO) {
+        val model = loadModel(historyItem)
+        val fileData =
+            db.fileDao().getContent(historyItem.path, historyItem.fileName!!, historyItem.projectId)
+                ?: return@withContext
+        val schemas: List<Schema> = prepareSchema(
+            historyItem.schema,
+            userPrompt = historyItem.prompt,
+            packageName = historyItem.path,
+            filesContext = filesContext.map {
+                """file name: 
+                    ${it.fileName}
+                    
+                    file content: 
+                    ${it.content}
+                """.trimIndent()
+            },
+            fileContent = fileData
+        )
+
+        val messages = toMessages(schemas)
+        sendMessages(model, messages, historyItem)?.let { responseData ->
+            db.fileDao().insertContentAndUpdateFileSize(fileData
+                .toContent()
+                .copy(content = responseData.response)
+            )
         }
     }
 
@@ -118,7 +161,7 @@ class AiService : LifecycleService() {
         historyItem: HistoryItem
     ): ResponseData? {
         val response = try {
-             model.createApiModel().sendMessage(
+            model.createApiModel().sendMessage(
                 MessageRequest(
                     messages
                 )
@@ -126,8 +169,7 @@ class AiService : LifecycleService() {
                 db.historyDao().markError(historyItem.promptId, "No response")
                 return null
             }
-        }
-        catch (e: Exception) {
+        } catch (e: Exception) {
             e.printStackTrace()
             val errorMessage = e.message ?: "Unknown error"
             db.historyDao().markError(historyItem.promptId, errorMessage)
@@ -195,7 +237,7 @@ class AiService : LifecycleService() {
         val baseName = inputFileName.lowercase().substringBeforeLast(".")
 
         // Extract the new extension from the first line of the code
-        codeInput.trim().lowercase().split("\n").forEach { line->
+        codeInput.trim().lowercase().split("\n").forEach { line ->
             val extensionPattern = """\.(\w+)""".toRegex()
             val matchResult = extensionPattern.find(line)
 
@@ -225,8 +267,7 @@ class AiService : LifecycleService() {
             val fileName = pathParts.removeLast().run {
                 if (this.endsWith(".bul")) {
                     this
-                }
-                else{
+                } else {
                     split(".")[0] + ".bul"
                 }
             }

@@ -12,6 +12,7 @@ import com.bulifier.core.databinding.CoreAiHistoryFragmentBinding
 import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.ai.history_adapter.HistoryAdapter
 import com.bulifier.core.ui.core.BaseFragment
+import com.bulifier.core.ui.main.MainViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -19,6 +20,7 @@ import kotlinx.coroutines.withContext
 class AiHistoryFragment : BaseFragment<CoreAiHistoryFragmentBinding>() {
 
     private val viewModel: HistoryViewModel by activityViewModels()
+    private val mainViewModel: MainViewModel by activityViewModels()
     private lateinit var adapter: HistoryAdapter
 
     override fun createBinding(
@@ -42,6 +44,11 @@ class AiHistoryFragment : BaseFragment<CoreAiHistoryFragmentBinding>() {
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
         binding.toolbar.backButton.setOnClickListener {
             findNavController().popBackStack()
+        }
+        binding.toolbar.newButton.setOnClickListener {
+            mainViewModel.fullPath.value?.run {
+                viewModel.callAi(path, content?.fileName)
+            }
         }
     }
 

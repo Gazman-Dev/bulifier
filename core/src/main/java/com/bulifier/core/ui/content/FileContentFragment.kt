@@ -14,6 +14,7 @@ class FileContentFragment : Fragment() {
 
     private lateinit var binding: CoreFileContentFragmentBinding
     private val viewModel by activityViewModels<MainViewModel>()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
