@@ -175,7 +175,7 @@ class SelectedHistoryViewHolder(
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.prompt.schemaSpinner.apply {
             this.adapter = adapter
-            viewModel.detailedItem.value?.schema?.let {
+            viewModel.selectedSchema?.let {
                 val selectedItem = schemas.map { s -> s.lowercase().trim() }.indexOf(it)
                 if(selectedItem != -1){
                     setSelection(selectedItem)
@@ -184,13 +184,15 @@ class SelectedHistoryViewHolder(
         }
     }
 
+    @SuppressLint("SetTextI18n")
     override fun bind(historyItem: HistoryItem?, position: Int) {
         this.historyItem = historyItem
         historyList.smoothScrollToPosition(position)
         bindToolbar(binding.toolbar, historyItem)
         updateChatBox(historyItem)
 
-        binding.prompt.path.text = historyItem?.path
+        binding.prompt.path.text =
+            "${historyItem?.path ?: ""}${if (historyItem?.fileName != null) "/${historyItem.fileName}" else ""}"
 
         binding.prompt.discardButton.text = when (historyItem?.status) {
             HistoryStatus.RESPONDED, HistoryStatus.ERROR -> {

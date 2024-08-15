@@ -72,8 +72,23 @@ interface SchemaDao {
 
 @Dao
 interface HistoryDao {
-    @Query("SELECT *, :promptId = prompt_id as selected FROM history where project_id = :projectId order by last_updated DESC")
-    fun getHistory(promptId: Long?, projectId: Long): PagingSource<Int, HistoryItemWithSelection>
+    @Query("""
+    SELECT *, 
+       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
+    FROM history 
+    WHERE project_id = :projectId 
+    ORDER BY last_updated DESC
+""")
+    fun getHistory(promptId: Long, projectId: Long): PagingSource<Int, HistoryItemWithSelection>
+
+    @Query("""
+    SELECT *, 
+       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
+    FROM history 
+    WHERE project_id = :projectId 
+    ORDER BY last_updated DESC
+""")
+    suspend fun getHistoryDebug(promptId: Long, projectId: Long): List<HistoryItemWithSelection>
 
     @Query("SELECT * FROM history WHERE status = :status and project_id = :projectId order by last_updated")
     fun getHistoryByStatus(status: HistoryStatus, projectId: Long): LiveData<List<HistoryItem>>

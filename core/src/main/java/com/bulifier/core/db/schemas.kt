@@ -56,7 +56,7 @@ class LongListConverter {
     fun stringToLongList(value: String): List<Long> = value.split(",")
         .filter { it.isNotBlank() }
         .map {
-            parseLong(it)
+            parseLong(it.trim())
         }
 }
 

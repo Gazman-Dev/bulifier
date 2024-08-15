@@ -78,7 +78,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         }
         binding.bottomBar.ai.setOnClickListener {
             viewModel.fullPath.value?.run {
-                historyViewModel.callAi(path, content?.fileName)
+                historyViewModel.createNewAiJob(path, content?.fileName)
             }
             findNavController().navigate(R.id.aiHistoryFragment)
         }

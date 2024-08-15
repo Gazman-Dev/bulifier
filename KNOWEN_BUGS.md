@@ -9,6 +9,4 @@
  - Clicking the "new" button on the Jobs Scheduler screen
    - expected: open the job detail screen
    - actual: it stays on the same screen and only add the new job to the list
-
-import com/game/snake/Snake
-import com/game/snake/Food
+ - project_id is not indexes properly on all the table, it needs to be references as foreign key and indexes

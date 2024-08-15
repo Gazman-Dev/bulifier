@@ -47,10 +47,19 @@ class AiHistoryFragment : BaseFragment<CoreAiHistoryFragmentBinding>() {
         }
         binding.toolbar.newButton.setOnClickListener {
             mainViewModel.fullPath.value?.run {
-                viewModel.callAi(path, content?.fileName)
+                viewModel.createNewAiJob(path, content?.fileName)
             }
         }
     }
+
+//    override fun onResume() {
+//        viewModel.historySource.value?.let {
+//            if(binding.historyList.adapter != null) {
+//                adapter.submitData(viewLifecycleOwner.lifecycle, it)
+//            }
+//        }
+//        super.onResume()
+//    }
 
     override fun onStop() {
         viewModel.saveToDraft()

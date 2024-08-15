@@ -1,19 +1,23 @@
 package com.bulifier.core.models.questions
 
 import com.bulifier.core.BuildConfig
-import com.bulifier.core.models.api.AnthropicModel
+import com.bulifier.core.models.api.AnthropicApiModel
 import com.bulifier.core.models.QuestionsModel
 import com.bulifier.core.ui.utils.Question
 
 class AnthropicQuestionsModel : QuestionsModel(
     listOf(
-        Question("Api Key", response = BuildConfig.CLAUDE_KEY)
+        Question("Api Key", response = BuildConfig.CLAUDE_KEY),
+        Question("Claude Model", response = "claude-3-5-sonnet-20240620", isPassword = false),
+        Question("Anthropic Version", response = "2023-06-01", isPassword = false),
     )
 ){
-    private val openAiKey
-        get() = questions[0].response
 
-    override fun createApiModel() = AnthropicModel(openAiKey)
+    override fun createApiModel() = AnthropicApiModel(
+        apiKey = questions[0].response,
+        model = questions[1].response,
+        anthropicVersion = questions[2].response,
+    )
 
     override val modelName = "claude"
 }

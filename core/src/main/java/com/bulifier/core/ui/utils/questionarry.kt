@@ -11,7 +11,8 @@ import com.bulifier.core.models.QuestionsModel
 data class Question(
     val title: String,
     val options: List<String>? = null, // Null if it's a text input question
-    var response: String = ""
+    var response: String = "",
+    val isPassword: Boolean = true // When true will hide the text
 )
 
 
@@ -29,6 +30,9 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveD
             val input = EditText(context)
             input.inputType = InputType.TYPE_CLASS_TEXT
             input.setText(currentQuestion.response)
+            if(currentQuestion.isPassword){
+                input.inputType = input.inputType or InputType.TYPE_TEXT_VARIATION_PASSWORD
+            }
             dialogBuilder.setView(input)
 
             dialogBuilder.setPositiveButton(if (currentIndex == questionsModel.questions.size - 1) "Submit" else "Next") { _, _ ->

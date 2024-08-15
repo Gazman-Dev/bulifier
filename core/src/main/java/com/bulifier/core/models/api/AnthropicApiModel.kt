@@ -15,18 +15,12 @@ import okhttp3.Response
 import java.io.IOException
 import java.util.concurrent.TimeUnit
 
-private const val ANTHROPIC_VERSION = "2023-06-01"
-private const val MODEL = "claude-3-5-sonnet-20240620"
 
-class AnthropicModel(openAiKey: String) : ApiModel {
-    private val client: AnthropicApiClient = AnthropicApiClient(openAiKey)
-
-    override suspend fun sendMessage(request: MessageRequest) =
-        client.sendConversation(request.messages)
-}
-
-
-class AnthropicApiClient(private val apiKey: String) {
+class AnthropicApiModel(
+    private val apiKey: String,
+    private val model: String,
+    private val anthropicVersion: String
+) : ApiModel {
     private val client = OkHttpClient.Builder()
         .readTimeout(2, TimeUnit.MINUTES)
         .writeTimeout(1, TimeUnit.MINUTES)
@@ -34,40 +28,39 @@ class AnthropicApiClient(private val apiKey: String) {
     private val baseUrl = "https://api.anthropic.com/v1/messages"
     private val gson = Gson()
 
-    suspend fun sendConversation(messages: List<MessageData>): String =
-        withContext(Dispatchers.IO) {
-            val requestBody = ConversationRequest(
-                model = MODEL,
-                maxTokens = 4096,
-                messages = messages.filter { it.role != "system" },
-                system = messages.dropLast(1).filter { it.role == "system" }
-                    .joinToString("\n") { it.content }
+    override suspend fun sendMessage(request: MessageRequest) = withContext(Dispatchers.IO) {
+        val requestBody = ConversationRequest(
+            model = model,
+            maxTokens = 4096,
+            messages = request.messages.filter { it.role != "system" },
+            system = request.messages.dropLast(1).filter { it.role == "system" }
+                .joinToString("\n") { it.content }
+        )
+
+        val apiRequest = Request.Builder()
+            .url(baseUrl)
+            .post(
+                gson.toJson(requestBody).toRequestBody("application/json".toMediaTypeOrNull())
             )
+            .addHeader("content-type", "application/json")
+            .addHeader("x-api-key", apiKey)
+            .addHeader("anthropic-version", anthropicVersion)
+            .build()
 
-            val request = Request.Builder()
-                .url(baseUrl)
-                .post(
-                    gson.toJson(requestBody).toRequestBody("application/json".toMediaTypeOrNull())
-                )
-                .addHeader("content-type", "application/json")
-                .addHeader("x-api-key", apiKey)
-                .addHeader("anthropic-version", ANTHROPIC_VERSION)
-                .build()
+        val response = client.newCall(apiRequest).execute()
+        val responseBody = response.body?.string()
 
-            val response = client.newCall(request).execute()
-            val responseBody = response.body?.string()
-
-            if (response.isSuccessful && responseBody != null) {
-                try {
-                    val apiResponse = gson.fromJson(responseBody, ApiResponse::class.java)
-                    apiResponse.content.firstOrNull { it.type == "text" }!!.text
-                } catch (e: Exception) {
-                    throwError(response, request, requestBody, responseBody)
-                }
-            } else {
-                throwError(response, request, requestBody, responseBody)
+        if (response.isSuccessful && responseBody != null) {
+            try {
+                val apiResponse = gson.fromJson(responseBody, ApiResponse::class.java)
+                apiResponse.content.firstOrNull { it.type == "text" }!!.text
+            } catch (e: Exception) {
+                throwError(response, apiRequest, requestBody, responseBody)
             }
+        } else {
+            throwError(response, apiRequest, requestBody, responseBody)
         }
+    }
 
     private fun throwError(
         response: Response,
