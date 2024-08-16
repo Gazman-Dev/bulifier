@@ -25,7 +25,6 @@ import kotlinx.coroutines.withContext
 
 class AiService : LifecycleService() {
 
-    private val workingQueue = mutableSetOf<Long>()
     private val responseProcessor = ResponseProcessor()
 
     override fun onCreate() {
@@ -40,101 +39,131 @@ class AiService : LifecycleService() {
                     }
                     return@forEach
                 }
-                if (workingQueue.add(historyItem.promptId)) {
-                    lifecycleScope.launch {
-                        val filesContext = if (historyItem.contextFiles.isNotEmpty()) {
-                            db.fileDao().getContent(historyItem.contextFiles)
-                        } else {
-                            emptyList()
-                        }
-                        try {
-                            process(historyItem, filesContext)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
-                            db.historyDao()
-                                .markError(historyItem.promptId, e.message ?: "Unknown error")
-                        }
+                lifecycleScope.launch {
+                    val filesContext = if (historyItem.contextFiles.isNotEmpty()) {
+                        db.fileDao().getContent(historyItem.contextFiles)
+                    } else {
+                        emptyList()
+                    }
+                    val responses = db.historyDao().getResponses(historyItem.promptId)
+                    try {
+                        process(historyItem, filesContext, responses)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        db.historyDao()
+                            .markError(historyItem.promptId, e.message ?: "Unknown error")
                     }
                 }
             }
         }
+
         var historyByStatus: LiveData<List<HistoryItem>>? = null
         Prefs.projectId.observe(this) {
             historyByStatus?.removeObserver(observer)
             historyByStatus =
-                db.historyDao().getHistoryByStatus(status = HistoryStatus.SUBMITTED, projectId = it)
+                db.historyDao().getHistoryByStatuses(
+                    statuses = listOf(
+                        HistoryStatus.SUBMITTED,
+                        HistoryStatus.RE_APPLYING
+                    ), projectId = it
+                )
             historyByStatus?.observe(this, observer)
         }
     }
 
-    private suspend fun process(historyItem: HistoryItem, filesContext: List<FileData>) {
+    private suspend fun process(
+        historyItem: HistoryItem,
+        filesContext: List<FileData>,
+        responses: List<ResponseItem>?
+    ) {
         when (historyItem.schema.lowercase()) {
             HistoryItem.SCHEMA_DEBULIFY -> {
-                handleDebulify(historyItem)
+                handleDebulify(historyItem, responses)
             }
 
             HistoryItem.SCHEMA_BULLIFY -> {
-                handleBulify(filesContext, historyItem)
+                handleBulify(filesContext, historyItem, responses)
             }
 
             HistoryItem.SCHEMA_REBULIFY_FILE -> {
-                handleRebulifyFile(filesContext, historyItem)
+                handleRebulifyFile(filesContext, historyItem, responses)
             }
 
             else -> throw Error("Unknown schema ${historyItem.schema}")
         }
     }
 
-    private suspend fun handleRebulifyFile(filesContext: List<FileData>, historyItem: HistoryItem) = withContext(Dispatchers.IO) {
-        val model = loadModel(historyItem)
-        val fileData =
-            db.fileDao().getContent(historyItem.path, historyItem.fileName!!, historyItem.projectId)
-                ?: return@withContext
-        val schemas: List<Schema> = prepareSchema(
-            historyItem.schema,
-            userPrompt = historyItem.prompt,
-            packageName = historyItem.path,
-            filesContext = filesContext.map {
-                """file name: 
+    private suspend fun handleRebulifyFile(
+        filesContext: List<FileData>,
+        historyItem: HistoryItem,
+        responses: List<ResponseItem>?
+    ) =
+        withContext(Dispatchers.IO) {
+            val model = loadModel(historyItem)
+            val fileData =
+                db.fileDao()
+                    .getContent(historyItem.path, historyItem.fileName!!, historyItem.projectId)
+                    ?: return@withContext
+            val response = responses?.firstOrNull()?.run {
+                ResponseData(historyItem, response).also {
+                    val newHistoryItem = historyItem.copy(
+                        status = HistoryStatus.RESPONDED
+                    )
+                    db.historyDao().updateHistory(
+                        newHistoryItem.copy(status = HistoryStatus.RESPONDED)
+                    )
+                }
+            } ?: kotlin.run {
+                val schemas: List<Schema> = prepareSchema(
+                    historyItem.schema,
+                    userPrompt = historyItem.prompt,
+                    packageName = historyItem.path,
+                    filesContext = filesContext.map {
+                        """file name: 
                     ${it.fileName}
                     
                     file content: 
                     ${it.content}
                 """.trimIndent()
-            },
-            fileContent = fileData
-        )
-
-        val messages = toMessages(schemas)
-        sendMessages(model, messages, historyItem)?.let { responseData ->
-            db.fileDao().insertContentAndUpdateFileSize(fileData
-                .toContent()
-                .copy(content = responseData.response)
-            )
-        }
-    }
-
-    private suspend fun handleDebulify(historyItem: HistoryItem) = withContext(Dispatchers.IO) {
-        val model = loadModel(historyItem)
-        db.fileDao().fetchFilesListByPathAndProjectId(historyItem.path, historyItem.projectId)
-            .forEach { file ->
-                val schemas: List<Schema> = prepareSchema(
-                    historyItem.schema,
-                    userPrompt = historyItem.prompt,
-                    packageName = historyItem.path,
-                    fileContent = db.fileDao().getContent(file.fileId)
+                    },
+                    fileContent = fileData
                 )
 
                 val messages = toMessages(schemas)
-                sendMessages(model, messages, historyItem)?.let { responseData ->
-                    applyDebulifyResponse(responseData, file)
-                }
+                sendMessages(model, messages, historyItem)
             }
-    }
+            if (response != null) {
+                db.fileDao().insertContentAndUpdateFileSize(
+                    fileData
+                        .toContent()
+                        .copy(content = response.response)
+                )
+            }
+        }
+
+    private suspend fun handleDebulify(historyItem: HistoryItem, responses: List<ResponseItem>?) =
+        withContext(Dispatchers.IO) {
+            val model = loadModel(historyItem)
+            db.fileDao().fetchFilesListByPathAndProjectId(historyItem.path, historyItem.projectId)
+                .forEach { file ->
+                    val schemas: List<Schema> = prepareSchema(
+                        historyItem.schema,
+                        userPrompt = historyItem.prompt,
+                        packageName = historyItem.path,
+                        fileContent = db.fileDao().getContent(file.fileId)
+                    )
+
+                    val messages = toMessages(schemas)
+                    sendMessages(model, messages, historyItem)?.let { responseData ->
+                        applyDebulifyResponse(responseData, file)
+                    }
+                }
+        }
 
     private suspend fun handleBulify(
         filesContext: List<FileData>,
-        historyItem: HistoryItem
+        historyItem: HistoryItem,
+        responses: List<ResponseItem>?
     ) {
         val schemas: List<Schema> = prepareSchema(historyItem.schema,
             userPrompt = historyItem.prompt,

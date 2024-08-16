@@ -10,3 +10,4 @@
    - expected: open the job detail screen
    - actual: it stays on the same screen and only add the new job to the list
  - project_id is not indexes properly on all the table, it needs to be references as foreign key and indexes
+ - When changing orientation while showing a file, the file content disappear.

@@ -47,7 +47,7 @@ class AiHistoryFragment : BaseFragment<CoreAiHistoryFragmentBinding>() {
         }
         binding.toolbar.newButton.setOnClickListener {
             mainViewModel.fullPath.value?.run {
-                viewModel.createNewAiJob(path, content?.fileName)
+                viewModel.createNewAiJob(path, fileName)
             }
         }
     }

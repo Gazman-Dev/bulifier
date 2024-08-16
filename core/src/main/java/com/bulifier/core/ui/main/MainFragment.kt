@@ -78,7 +78,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         }
         binding.bottomBar.ai.setOnClickListener {
             viewModel.fullPath.value?.run {
-                historyViewModel.createNewAiJob(path, content?.fileName)
+                historyViewModel.createNewAiJob(path, fileName)
             }
             findNavController().navigate(R.id.aiHistoryFragment)
         }
@@ -94,6 +94,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             val showFileContent = it != null
             binding.recyclerView.isVisible = !showFileContent
             binding.fileContent.isVisible = showFileContent
+            binding.bottomBar.toolbar.isVisible = !showFileContent
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -109,11 +110,11 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
     private fun registerPath() {
         viewModel.fullPath.observe(viewLifecycleOwner) {
-            updatePath(it.path, it.content)
+            updatePath(it.path, it.fileName)
         }
     }
 
-    private fun updatePath(path: String, content: FileData?) {
+    private fun updatePath(path: String, fileName: String?) {
         val pathParts = path.split("/")
         createClickableSpanString(binding.path, pathParts.mapIndexed { index, value ->
             TitleAction(value) {
@@ -133,8 +134,8 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                 }
             }
         }.run {
-            if (content != null) {
-                this + TitleAction(content.fileName) {}
+            if (fileName != null) {
+                this + TitleAction(fileName) {}
             } else {
                 this
             }

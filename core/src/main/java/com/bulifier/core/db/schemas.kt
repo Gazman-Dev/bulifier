@@ -279,6 +279,7 @@ data class ResponseItem(
 
 enum class HistoryStatus {
     PROMPTING,
+    RE_APPLYING, // reapplying
     SUBMITTED, // loading
     RESPONDED, // completed
     ERROR

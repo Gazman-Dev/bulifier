@@ -90,8 +90,8 @@ interface HistoryDao {
 """)
     suspend fun getHistoryDebug(promptId: Long, projectId: Long): List<HistoryItemWithSelection>
 
-    @Query("SELECT * FROM history WHERE status = :status and project_id = :projectId order by last_updated")
-    fun getHistoryByStatus(status: HistoryStatus, projectId: Long): LiveData<List<HistoryItem>>
+    @Query("SELECT * FROM history WHERE status in (:statuses) and project_id = :projectId order by last_updated")
+    fun getHistoryByStatuses(statuses: List<HistoryStatus>, projectId: Long): LiveData<List<HistoryItem>>
 
     @Delete
     suspend fun deleteHistoryItem(history: HistoryItem)
@@ -226,6 +226,15 @@ interface FileDao {
 
     @Query(
         """SELECT 
+            content
+        FROM contents 
+        WHERE contents.file_id = :fileId
+        """
+    )
+    fun getContentLiveData(fileId: Long): LiveData<String>?
+
+    @Query(
+        """SELECT 
             files.file_name, 
             files.path, 
             contents.* 
@@ -301,7 +310,7 @@ data class FileData(
     val content: String = "",
 
     @ColumnInfo(name = "type")
-    val type: Type = Type.NONE
+    val type: Type
 ) {
     fun toContent() = Content(
         fileId = fileId,

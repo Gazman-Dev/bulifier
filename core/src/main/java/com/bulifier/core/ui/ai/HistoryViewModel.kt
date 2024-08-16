@@ -181,7 +181,11 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
                 historyItem?.apply {
                     historyDb.updateHistory(
                         copy(
-                            status = HistoryStatus.SUBMITTED,
+                            status = if(status == HistoryStatus.RESPONDED){
+                                HistoryStatus.RE_APPLYING
+                            } else {
+                                HistoryStatus.SUBMITTED
+                            },
                             prompt = prompt
                         )
                     )
