@@ -5,6 +5,7 @@
     android:id="@+id/toolbar"
     android:layout_width="match_parent"
     android:layout_height="?attr/actionBarSize"
+    tools:layout_height="wrap_content"
     android:background="@color/core_colorPrimary"
     android:gravity="center_vertical"
     android:orientation="horizontal">
@@ -26,16 +27,19 @@
         android:layout_marginEnd="16dp"
         android:layout_weight="1"
         android:gravity="center"
-        android:text="Search project"
+        android:text="Jobs Scheduler"
         android:textColor="@color/core_white" />
 
-    <ImageView
+    <Space
+        android:layout_width="0dp"
+        android:layout_height="1dp"
+        android:layout_weight="1" />
 
-        android:id="@+id/user_logo"
+    <Button
+        android:id="@+id/newButton"
         android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:adjustViewBounds="true"
-        tools:srcCompat="@tools:sample/avatars" />
+        android:layout_height="wrap_content"
+        android:text="New" />
 
 
 </LinearLayout>

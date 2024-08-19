@@ -10,9 +10,8 @@ import com.aallam.openai.client.OpenAI
 import com.bulifier.core.api.MessageRequest
 import com.bulifier.core.models.ApiModel
 import kotlin.time.Duration.Companion.minutes
-import kotlin.time.Duration.Companion.seconds
 
-class OpenAiModel(openAiKey: String, openAiOrg: String, private val modelName: String) : ApiModel {
+class OpenAiApiModel(openAiKey: String, openAiOrg: String, private val modelName: String) : ApiModel {
 
 
     private val openAI = OpenAI(

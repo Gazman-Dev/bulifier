@@ -1,17 +1,98 @@
 <?xml version="1.0" encoding="utf-8"?>
-<HorizontalScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <EditText
-        android:id="@+id/textBox"
-        android:layout_width="wrap_content"
-        android:layout_height="match_parent"
-        android:gravity="start|top"
-        android:hint="Code here"
-        android:inputType="textMultiLine|textNoSuggestions"
-        android:maxLength="100000"
-        android:overScrollMode="always"
-        android:scrollbars="horizontal|vertical"
-        android:scrollHorizontally="true" />
-</HorizontalScrollView>
+    <FrameLayout
+        android:layout_width="0dp"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@id/bottomBar"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent">
+
+        <com.bulifier.core.ui.content.CustomHorizontalScrollView
+            android:id="@+id/horizontalScrollViewTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="horizontal">
+
+            <TextView
+                android:id="@+id/textBoxView"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="start|top"
+                android:maxLength="100000"
+                android:overScrollMode="always"
+                android:scrollbars="horizontal|vertical"
+                android:scrollHorizontally="true"
+                android:textSize="18sp" />
+        </com.bulifier.core.ui.content.CustomHorizontalScrollView>
+
+        <com.bulifier.core.ui.content.CustomHorizontalScrollView
+            android:id="@+id/horizontalScrollViewEditText"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="horizontal"
+            android:visibility="gone">
+
+            <EditText
+                android:id="@+id/textBox"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:gravity="start|top"
+                android:hint="Code here"
+                android:inputType="textMultiLine|textNoSuggestions"
+                android:maxLength="100000"
+                android:overScrollMode="always"
+                android:scrollbars="horizontal|vertical"
+                android:scrollHorizontally="true"
+                android:textSize="18sp" />
+        </com.bulifier.core.ui.content.CustomHorizontalScrollView>
+
+    </FrameLayout>
+
+
+    <LinearLayout
+        android:id="@+id/bottomBar"
+        android:layout_width="0dp"
+        android:layout_height="?attr/actionBarSize"
+        android:background="@color/core_colorPrimary"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        tools:layout_height="wrap_content">
+
+        <ImageView
+            android:id="@+id/ai"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_margin="8dp"
+            android:adjustViewBounds="true"
+            android:src="@drawable/core_bullify_24"
+            app:tint="@color/core_white" />
+
+        <Space
+            android:layout_width="0dp"
+            android:layout_height="1dp"
+            android:layout_weight="1" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/editMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:checked="false"
+            android:includeFontPadding="true"
+            android:paddingEnd="8dp"
+            android:text="Edit Mode "
+            android:textColor="@color/core_white"
+            app:thumbTint="@color/core_colorPrimaryDark" />
+
+
+    </LinearLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

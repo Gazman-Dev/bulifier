@@ -2,10 +2,12 @@ package com.bulifier.core.schemas
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
+import com.bulifier.core.BuildConfig
 import com.bulifier.core.db.AppDatabase
 import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
+import com.bulifier.core.utils.appVersionCode
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -33,41 +35,46 @@ object SchemaModel {
 
     fun init(context: Context) {
         db = context.db
+
         val preferences = context.getSharedPreferences("schema", 0)
-        if (preferences.getBoolean("prepared_2", false)) {
+        if (!BuildConfig.DEBUG && preferences.getLong("prepared", 0) >= context.appVersionCode) {
             return
         }
-        preferences.edit().putBoolean("prepared_2", true).apply()
+
+        preferences.edit().putLong("prepared", context.appVersionCode).apply()
 
         scope.launch {
             prepareSchemasNow(context)
         }
     }
 
+
+
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     suspend fun prepareSchemasNow(context: Context) {
         withContext(Dispatchers.IO) {
-            context.assets.list("schemas")?.forEach { fileName ->
+            context.assets.list("schemas")?.map { fileName ->
                 context.assets.open("schemas/$fileName").bufferedReader().use {
                     val schemaData = it.readText()
-                    val schemas = parseSchema(
+                    parseSchema(
                         schemaData, fileName
                             .split(".")
                             .first()
                     )
-                    context.db.schemaDao().addSchemas(schemas)
                 }
+            }?.run {
+                context.db.schemaDao().addSchemas(flatten())
             }
         }
     }
 
     suspend fun getSchemaNames() = db.schemaDao().getSchemaNames()
 
-    private fun parseSchema(schema: String, name: String): List<Schema> {
+    private fun parseSchema(content: String, schemaName: String): List<Schema> {
         val pattern = """#(\s*)[0-9a-zA-Z_\-]+""".toRegex()
 
         // Find all matches of the pattern
-        val matches = pattern.findAll(schema)
+        val matches = pattern.findAll(content)
 
         // Split the input string into sections based on the matches
         val sections = mutableListOf<String>()
@@ -75,13 +82,13 @@ object SchemaModel {
         var lastIndex = 0
         for (match in matches) {
             headers.add(match.value.substring(1).trim())
-            val section = schema.substring(lastIndex, match.range.first).trim()
+            val section = content.substring(lastIndex, match.range.first).trim()
             if (section.isNotEmpty()) {
                 sections.add(section)
             }
             lastIndex = match.range.last + 1
         }
-        val section = schema.substring(lastIndex).trim()
+        val section = content.substring(lastIndex).trim()
         if (section.isNotEmpty()) {
             sections.add(section)
         }
@@ -98,7 +105,7 @@ object SchemaModel {
             }
 
             Schema(
-                schemaName = name,
+                schemaName = schemaName,
                 content = sections[index],
                 type = type,
                 keys = LinkedHashSet(keys)

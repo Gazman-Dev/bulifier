@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MediatorLiveData
 import androidx.lifecycle.MutableLiveData
+import androidx.lifecycle.switchMap
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -24,8 +25,14 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 data class FullPath(
-    val content: FileData?,
+    val fileName: String?,
     val path: String
+)
+
+data class FileInfo(
+    val fileId: Long,
+    val fileName: String,
+    var editing: Boolean = false
 )
 
 class MainViewModel(val app: Application) : AndroidViewModel(app) {
@@ -42,16 +49,25 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         db.fetchProjects()
     }.flow.cachedIn(viewModelScope)
 
-    val openedFile: LiveData<FileData?> = MutableLiveData()
+    val openedFile: LiveData<FileInfo?> = MutableLiveData()
+    val fileContent = openedFile.switchMap { fileInfo ->
+        if (fileInfo != null) {
+            app.db.fileDao().getContentLiveData(fileInfo.fileId)
+        } else {
+            MutableLiveData(null as String?) as LiveData<String?>
+        }
+    }
+
+
     val fullPath = MediatorLiveData<FullPath>().apply {
         addSource(openedFile) {
             value = kotlin.run {
                 val value = path.value
-                FullPath(it, extractPath(value))
+                FullPath(it?.fileName, extractPath(value))
             }
         }
         addSource(path) {
-            value = FullPath(openedFile.value, extractPath(it))
+            value = FullPath(openedFile.value?.fileName, extractPath(it))
         }
     }
 
@@ -82,13 +98,16 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val content = db.getContent(file.fileId) ?: FileData(
                 fileId = file.fileId,
-                fileName = "",
-                path = path.value ?: "",
+                fileName = file.fileName,
+                path = file.path,
                 content = "",
                 type = Content.Type.NONE
             )
             openedFile as MutableLiveData
-            openedFile.value = content
+            openedFile.value = FileInfo(
+                fileId = content.fileId,
+                fileName = content.fileName
+            )
         }
     }
 
@@ -114,7 +133,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun createProject(projectName: String) {
-        val projectId = db.fetchProjects(Project(projectName = projectName))
+        val projectId = db.insertProject(Project(projectName = projectName))
         withContext(Dispatchers.Main) {
             Prefs.projectId.set(projectId)
             Prefs.projectName.set(projectName)
@@ -122,7 +141,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    suspend fun selectProject(project:Project) {
+    suspend fun selectProject(project: Project) {
         withContext(Dispatchers.Main) {
             projectId.set(project.projectId)
             projectName.set(project.projectName)
@@ -153,24 +172,32 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val projectId = projectId.value ?: return@launch
             val path = path.value ?: return@launch
-            db.insertFileAndUpdateParent(
-                File(
-                    fileName = folderName,
-                    projectId = projectId,
-                    isFile = false,
-                    path = path
+            val extraPathParts = mutableListOf<String>()
+            val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
+            folderName.split("[^a-zA-Z0-9]".toRegex()).forEach {
+                db.insertFileAndUpdateParent(
+                    File(
+                        fileName = it,
+                        projectId = projectId,
+                        isFile = false,
+                        path = (pathParts + extraPathParts).joinToString("/")
+                    )
                 )
-            )
+                extraPathParts += it
+            }
+            updatePath((pathParts + extraPathParts).joinToString("/"))
         }
     }
 
     fun updateFileContent(content: String) {
         val openedFile = openedFile.value ?: return
         viewModelScope.launch {
-            db.insertContentAndUpdateFileSize(Content(
-                fileId = openedFile.fileId,
-                content = content
-            ))
+            db.insertContentAndUpdateFileSize(
+                Content(
+                    fileId = openedFile.fileId,
+                    content = content
+                )
+            )
         }
     }
 
@@ -182,7 +209,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun deleteProject(project: Project) = viewModelScope.launch{
+    fun deleteProject(project: Project) = viewModelScope.launch {
         db.deleteProject(project)
     }
 

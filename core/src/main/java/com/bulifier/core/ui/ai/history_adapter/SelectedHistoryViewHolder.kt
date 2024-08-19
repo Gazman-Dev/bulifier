@@ -18,9 +18,9 @@ import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.db.HistoryStatus
 import com.bulifier.core.models.QuestionsModel
 import com.bulifier.core.models.questions.AnthropicQuestionsModel
-import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.models.questions.ModelsQuestionsModel
 import com.bulifier.core.models.questions.OpenAiQuestionsModel
+import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.ui.ai.AiHistoryFragmentDirections
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.utils.showQuestionsDialog
@@ -47,6 +47,7 @@ class SelectedHistoryViewHolder(
                         )
                     )
                 }
+
                 else -> {
                     viewModel.discard()
                 }
@@ -85,24 +86,24 @@ class SelectedHistoryViewHolder(
             adapter.addAll(it + addModelKey)
             updateBackground()
 
-            binding.prompt.modelSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener{
-                override fun onItemSelected(
-                    parent: AdapterView<*>?,
-                    view: View?,
-                    position: Int,
-                    id: Long
-                ) {
-                    if (position == adapter.count - 1) {
-                        createModel()
+            binding.prompt.modelSpinner.onItemSelectedListener =
+                object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(
+                        parent: AdapterView<*>?,
+                        view: View?,
+                        position: Int,
+                        id: Long
+                    ) {
+                        if (position == adapter.count - 1) {
+                            createModel()
+                        } else {
+                            val modelKey = adapter.getItem(position)!!
+                            viewModel.updateModelKey(modelKey)
+                        }
                     }
-                    else{
-                        val modelKey = adapter.getItem(position)!!
-                        viewModel.updateModelKey(modelKey)
-                    }
-                }
 
-                override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-            }
+                    override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+                }
         }
         if (Prefs.models.value.isNullOrEmpty()) {
             adapter.add(addModelKey)
@@ -123,18 +124,27 @@ class SelectedHistoryViewHolder(
         val context = binding.root.context
 
         val modelsQuestionsModel = ModelsQuestionsModel()
-        showQuestionsDialog(modelsQuestionsModel, context).observe(viewLifecycleOwner) { completed ->
+        showQuestionsDialog(
+            modelsQuestionsModel,
+            context
+        ).observe(viewLifecycleOwner) { completed ->
             if (completed) {
-                when(modelsQuestionsModel.model){
+                when (modelsQuestionsModel.model) {
                     ModelsQuestionsModel.Model.OpenAI -> showModelQuestions(
                         context,
                         OpenAiQuestionsModel()
                     )
+
                     ModelsQuestionsModel.Model.Claude -> showModelQuestions(
                         context,
                         AnthropicQuestionsModel()
                     )
-                    ModelsQuestionsModel.Model.Error, ModelsQuestionsModel.Model.ModelModels -> Toast.makeText(context, "Invalid input", Toast.LENGTH_SHORT).show()
+
+                    ModelsQuestionsModel.Model.Error, ModelsQuestionsModel.Model.ModelModels -> Toast.makeText(
+                        context,
+                        "Invalid input",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
@@ -175,26 +185,37 @@ class SelectedHistoryViewHolder(
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         binding.prompt.schemaSpinner.apply {
             this.adapter = adapter
-            viewModel.detailedItem.value?.schema?.let {
+            viewModel.selectedSchema?.let {
                 val selectedItem = schemas.map { s -> s.lowercase().trim() }.indexOf(it)
-                if(selectedItem != -1){
+                if (selectedItem != -1) {
                     setSelection(selectedItem)
                 }
             }
         }
     }
 
+    @SuppressLint("SetTextI18n")
     override fun bind(historyItem: HistoryItem?, position: Int) {
         this.historyItem = historyItem
         historyList.smoothScrollToPosition(position)
         bindToolbar(binding.toolbar, historyItem)
         updateChatBox(historyItem)
 
+        binding.prompt.path.text =
+            "${historyItem?.path ?: ""}${if (historyItem?.fileName != null) "/${historyItem.fileName}" else ""}"
+
         binding.prompt.discardButton.text = when (historyItem?.status) {
             HistoryStatus.RESPONDED, HistoryStatus.ERROR -> {
                 "Logs"
             }
+
             else -> "Discard"
+        }
+
+        binding.prompt.sendButton.text = if (historyItem?.status == HistoryStatus.RESPONDED) {
+            "Re-Apply"
+        } else {
+            "Send"
         }
     }
 

@@ -28,8 +28,12 @@ You are an expert bullet-file writer. Your task is to create one or multiple bul
 Use the following bullet-file schema for each file:
 
 FileName: {package}/FileName.bul (.bul must be the file extension)
-Imports (only if needed, only bullet-files may be imported): {package}.OtherFile1, {package}.OtherFile2
- - Class/Module {ClassName or ModuleName}
+
+(Add imports only if needed, only bullet-files may be imported)
+import my.package.myFile
+import my.package.myOtherFile
+
+ - Class/Module (ClassName or ModuleName)
    - Fields
      - field1: type, initial value (use generic types)
      - field2: type, initial value

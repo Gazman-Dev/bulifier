@@ -48,6 +48,7 @@ abstract class BaseHistoryViewHolder(
             HistoryStatus.PROMPTING -> "Prompting"
             HistoryStatus.SUBMITTED -> "Loading"
             HistoryStatus.RESPONDED -> "Success"
+            HistoryStatus.RE_APPLYING -> "Re-Applying"
             null -> "---"
         }
     }

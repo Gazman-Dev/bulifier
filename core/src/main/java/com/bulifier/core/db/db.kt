@@ -51,8 +51,12 @@ interface SchemaDao {
     @Insert
     suspend fun addSchema(schema: Schema)
 
+    @Query("DELETE FROM schemas")
+    suspend fun deleteAllSchemas()
+
     @Transaction
     suspend fun addSchemas(schemas: List<Schema>) {
+        deleteAllSchemas()
         schemas.forEach {
             addSchema(it)
         }
@@ -68,11 +72,26 @@ interface SchemaDao {
 
 @Dao
 interface HistoryDao {
-    @Query("SELECT *, :promptId = prompt_id as selected FROM history order by last_updated DESC")
-    fun getHistory(promptId: Long?): PagingSource<Int, HistoryItemWithSelection>
+    @Query("""
+    SELECT *, 
+       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
+    FROM history 
+    WHERE project_id = :projectId 
+    ORDER BY last_updated DESC
+""")
+    fun getHistory(promptId: Long, projectId: Long): PagingSource<Int, HistoryItemWithSelection>
 
-    @Query("SELECT * FROM history WHERE status = :status")
-    fun getHistory(status: HistoryStatus = HistoryStatus.SUBMITTED): LiveData<List<HistoryItem>>
+    @Query("""
+    SELECT *, 
+       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
+    FROM history 
+    WHERE project_id = :projectId 
+    ORDER BY last_updated DESC
+""")
+    suspend fun getHistoryDebug(promptId: Long, projectId: Long): List<HistoryItemWithSelection>
+
+    @Query("SELECT * FROM history WHERE status in (:statuses) and project_id = :projectId order by last_updated")
+    fun getHistoryByStatuses(statuses: List<HistoryStatus>, projectId: Long): LiveData<List<HistoryItem>>
 
     @Delete
     suspend fun deleteHistoryItem(history: HistoryItem)
@@ -117,13 +136,15 @@ interface FileDao {
         type: String = Type.RAW.toString()
     ): List<Content>
 
-    @Query("""SELECT 
+    @Query(
+        """SELECT 
             files.file_name, 
             files.path, 
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
-        WHERE project_id = :projectId""")
+        WHERE project_id = :projectId"""
+    )
     fun fetchFilesListByProjectId(
         projectId: Long
     ): List<FileData>
@@ -178,37 +199,81 @@ interface FileDao {
     suspend fun deleteFile(fileId: Long)
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
-    suspend fun fetchProjects(project: Project): Long
+    suspend fun insertProject(project: Project): Long
 
-    @Query("select * from projects")
+    @Query("select * from projects order by last_updated desc")
     fun fetchProjects(): PagingSource<Int, Project>
 
     @Transaction
     suspend fun createProjectAndRoot(project: Project, defaultFiles: Array<File>) {
-        val projectId = fetchProjects(project)
+        val projectId = insertProject(project)
         defaultFiles.forEach {
             insertFile(it.copy(projectId = projectId))
         }
     }
 
-    @Query("""SELECT 
+    @Query(
+        """SELECT 
             files.file_name, 
             files.path, 
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
         WHERE contents.file_id = :fileId
-        """)
+        """
+    )
     suspend fun getContent(fileId: Long): FileData?
 
-    @Query("""SELECT 
+    @Query(
+        """SELECT 
+            content
+        FROM contents 
+        WHERE contents.file_id = :fileId
+        """
+    )
+    fun getContentLiveData(fileId: Long): LiveData<String>?
+
+    @Query(
+        """SELECT 
+            files.file_name, 
+            files.path, 
+            contents.* 
+        FROM contents 
+            join files on contents.file_id = files.file_id
+        WHERE files.path = :path and files.file_name = :fileName AND files.project_id = :projectId
+        """
+    )
+    suspend fun getContent(path: String, fileName: String, projectId: Long): FileData?
+
+    @Query(
+        """SELECT
+            min(contents.content) 
+        FROM contents 
+            join files on contents.file_id = files.file_id
+        WHERE files.path = :path and files.file_name = :fileName AND files.project_id = :projectId
+        """
+    )
+    suspend fun getRawContentByPath(path: String, fileName:String, projectId: Long): String?
+
+    @Query(
+        """SELECT
+            min(file_id) 
+        FROM files
+        WHERE files.path = :path AND files.project_id = :projectId and files.file_name = :fileName
+        """
+    )
+    suspend fun getFileId(path: String, fileName: String, projectId: Long): Long?
+
+    @Query(
+        """SELECT 
             files.file_name, 
             files.path, 
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
         WHERE contents.file_id IN (:fileIds)
-        """)
+        """
+    )
     suspend fun getContent(fileIds: List<Long>): List<FileData>
 
     @Transaction
@@ -226,6 +291,9 @@ interface FileDao {
 
     @Delete
     suspend fun _deleteProject(project: Project)
+
+    @Query("select count(*) == 0 from files WHERE path = :path AND project_id = :projectId")
+    suspend fun isPathEmpty(path: String, projectId: Long): Boolean
 }
 
 data class FileData(
@@ -242,8 +310,8 @@ data class FileData(
     val content: String = "",
 
     @ColumnInfo(name = "type")
-    val type: Type = Type.NONE
-){
+    val type: Type
+) {
     fun toContent() = Content(
         fileId = fileId,
         content = content,
