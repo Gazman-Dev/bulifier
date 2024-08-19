@@ -1,6 +1,6 @@
 # Bulifier
 
-*Watch the demo on [YouTube](https://youtu.be/r4CRRmyYLLY)*
+*Watch the NEW demo on [YouTube](https://www.youtube.com/watch?v=Q0iQKEnIRtI&t=2s)*
 
 [Release Notes](RELEASE_NOTES.md) | [Known Bugs](KNOWN_BUGS.md)
 
