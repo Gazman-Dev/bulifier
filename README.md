@@ -1,49 +1,27 @@
 # Bulifier
 
-*watch demo on [YouTube](https://youtu.be/r4CRRmyYLLY)*
+*Watch the demo on [YouTube](https://youtu.be/r4CRRmyYLLY)*
 
-Bulifier is an innovative open-source project that aims to transform software development by leveraging AI and introducing a new intermediary language based on bullet points. It's designed to bridge the gap between human logic and AI-generated code, potentially moving development from laptops to mobile devices.
+[Release Notes](RELEASE_NOTES.md) | [Known Bugs](KNOWN_BUGS.md)
 
-## Core Concepts
+---
 
-Bulifier introduces three primary actions:
+Bulifier is an open-source project that leverages AI to revolutionize software development, introducing a new intermediary language based on bullet points. The project aims to bridge the gap between human logic and AI-generated code, making mobile-based development a reality.
 
-1. **Bulify**: Convert your ideas into structured bullet points.
-2. **Debulify**: Transform bullet point files into various output formats (e.g., Python, Java, or prose).
-3. **Rebulify**: Update existing bullet point files with new features or modifications (not yet implemented).
+## Key Concepts
 
-## Key Features
+- **Bulify**: Convert your ideas into structured bullet points.
+- **Debulify**: Transform bullet points into various output formats (e.g., Python, Java, or prose).
+- **Rebulify**: Update existing bullet point files with new features or modifications.
 
-- **Bullet Point Language**: A logical, English-based structure for expressing complex ideas.
-- **AI Integration**: Leverages AI to interpret bullet points and generate code or other outputs.
-- **Mobile-First Development**: Aims to enable software development primarily on mobile devices.
+Bulifier envisions a future where developers focus on high-level logic while AI handles the code generation, allowing software development to shift from laptops to mobile devices.
 
-## Vision
+## Getting Started & Contributing
 
-Bulifier's vision is twofold:
+This is a fully functional Android project. Start by running the demo module.
 
-1. Transition from traditional coding to writing logical bullet points that AI can interpret and transform into code.
-2. Enable mobile-based development by reducing the need for extensive typing and leveraging conversational AI.
-
-## The Future of Development
-
-Bulifier proposes a future where:
-
-- Developers focus on logic and high-level concepts rather than low-level implementation details.
-- AI handles boilerplate and repetitive coding tasks.
-- Human creativity and innovation remain crucial, even as AI capabilities advance.
-
-## Getting Started
-
-It is a fully working Android project. Start by running the demo module.
-
-## Contributing
-
-We welcome contributions to the Bulifier project. 
-Please start by creating an issue with your modification idea, so we are on the same page and go from there.
-
-Also feel free to drop PRs directly for trivial changes.
+We welcome contributions! A great place to start is by checking out the [Known Bugs](KNOWN_BUGS.md) file. Feel free to submit PRs for small changes or create an issue to discuss larger modifications.
 
 ## License
 
-Bulifier is open-source software released by Gazman Dev LLC under the Apache 2.0 license.
+Bulifier is released under the Apache 2.0 license by Gazman Dev LLC.

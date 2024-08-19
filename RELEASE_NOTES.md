@@ -1,14 +1,18 @@
 # Bulifier Release Notes
 
 ## Release 1.1
-**Features**
- - This release notes page ;)
- - Added the ability to create folders using full path, no need to create a package one by anymore
- - Simplified AI buttons to just one - It will do its best to predict the schema and you can change it manually
- - Add path to Job Scheduling View
 
-**Bug Fixes**
- - On the jobs screen you see jobs from other projects
+**New Features:**
+- Introduced the ability to rebulify a single file.
+- Added this release notes page. 😉
+- Enabled full-path folder creation, eliminating the need to create packages one by one.
+- Simplified AI interaction to a single button for schema prediction, with manual adjustment options.
+- Added path information to the Job Scheduling screen.
+- Enabled the option to secure specific model fields as passwords for easier screen sharing.
+
+**Bug Fixes:**
+- Resolved an issue where jobs from other projects appeared on the jobs screen.
 
 ## Release 1.0
-Hello Bulifier - Project lunched!!!
+
+Hello Bulifier - Project launched!
