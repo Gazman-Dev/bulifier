@@ -34,6 +34,19 @@
         android:layout_marginEnd="4dp"
         android:textSize="14sp"
         app:layout_constraintBottom_toBottomOf="@+id/itemTitle"
+        app:layout_constraintEnd_toStartOf="@id/moreIcon"
+        app:layout_constraintTop_toTopOf="@+id/itemTitle"
+        tools:text="128k" />
+
+    <ImageView
+        android:padding="2dp"
+        android:id="@+id/moreIcon"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginEnd="4dp"
+        android:textSize="14sp"
+        android:src="@drawable/baseline_more_vert_24"
+        app:layout_constraintBottom_toBottomOf="@+id/itemTitle"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toTopOf="@+id/itemTitle"
         tools:text="128k" />

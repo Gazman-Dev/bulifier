@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "0281db89dc85369e7fd27d87abf81b0f",
+    "identityHash": "52aa9464eedc23f1d2e9d5f023cd3d1d",
     "entities": [
       {
         "tableName": "projects",
@@ -48,7 +48,7 @@
       },
       {
         "tableName": "files",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`file_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `project_id` INTEGER NOT NULL, `path` TEXT NOT NULL, `file_name` TEXT NOT NULL, `is_file` INTEGER NOT NULL, `size` INTEGER NOT NULL, `file_count` INTEGER NOT NULL, FOREIGN KEY(`project_id`) REFERENCES `projects`(`project_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`file_id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `project_id` INTEGER NOT NULL, `path` TEXT NOT NULL, `file_name` TEXT NOT NULL, `is_file` INTEGER NOT NULL, `size` INTEGER NOT NULL, FOREIGN KEY(`project_id`) REFERENCES `projects`(`project_id`) ON UPDATE NO ACTION ON DELETE CASCADE )",
         "fields": [
           {
             "fieldPath": "fileId",
@@ -83,12 +83,6 @@
           {
             "fieldPath": "size",
             "columnName": "size",
-            "affinity": "INTEGER",
-            "notNull": true
-          },
-          {
-            "fieldPath": "filesCount",
-            "columnName": "file_count",
             "affinity": "INTEGER",
             "notNull": true
           }
@@ -410,7 +404,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0281db89dc85369e7fd27d87abf81b0f')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '52aa9464eedc23f1d2e9d5f023cd3d1d')"
     ]
   }
 }

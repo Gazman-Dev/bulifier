@@ -244,7 +244,7 @@ class AiService : LifecycleService() {
             throw Error("Couldn't extract file name from response \n${responseData.response} \n${file.fileName}")
         }
 
-        val fileId = db.fileDao().insertFileAndUpdateParent(
+        val fileId = db.fileDao().insertFile(
             File(
                 projectId = projectId,
                 fileName = fileName,
@@ -302,7 +302,7 @@ class AiService : LifecycleService() {
             }
 
             val path = pathParts.joinToString("/")
-            val fileId = db.fileDao().insertFileAndUpdateParent(
+            val fileId = db.fileDao().insertFile(
                 File(
                     projectId = projectId,
                     fileName = fileName,

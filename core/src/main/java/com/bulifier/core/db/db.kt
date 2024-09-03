@@ -72,26 +72,33 @@ interface SchemaDao {
 
 @Dao
 interface HistoryDao {
-    @Query("""
+    @Query(
+        """
     SELECT *, 
        CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
     FROM history 
     WHERE project_id = :projectId 
     ORDER BY last_updated DESC
-""")
+"""
+    )
     fun getHistory(promptId: Long, projectId: Long): PagingSource<Int, HistoryItemWithSelection>
 
-    @Query("""
+    @Query(
+        """
     SELECT *, 
        CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
     FROM history 
     WHERE project_id = :projectId 
     ORDER BY last_updated DESC
-""")
+"""
+    )
     suspend fun getHistoryDebug(promptId: Long, projectId: Long): List<HistoryItemWithSelection>
 
     @Query("SELECT * FROM history WHERE status in (:statuses) and project_id = :projectId order by last_updated")
-    fun getHistoryByStatuses(statuses: List<HistoryStatus>, projectId: Long): LiveData<List<HistoryItem>>
+    fun getHistoryByStatuses(
+        statuses: List<HistoryStatus>,
+        projectId: Long
+    ): LiveData<List<HistoryItem>>
 
     @Delete
     suspend fun deleteHistoryItem(history: HistoryItem)
@@ -167,33 +174,11 @@ interface FileDao {
         updateFileSize(content.fileId, content.content.length)
     }
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertFile(file: File): Long
 
     @Query("SELECT * FROM files WHERE path = :path AND file_name = :fileName AND project_id = :projectId LIMIT 1")
     suspend fun findParentFolder(path: String, fileName: String, projectId: Long): File?
-
-    @Query("UPDATE files SET file_count = file_count + :count WHERE file_id = :parentId")
-    suspend fun updateFileCount(parentId: Long, count: Int)
-
-    @Transaction
-    suspend fun insertFileAndUpdateParent(file: File): Long {
-        val fileId = insertFile(file)
-        if (fileId != -1L) {
-            val parentFolder = findParentFolder(file.path, file.fileName, file.projectId)
-                ?: throw IllegalArgumentException("Parent folder not found")
-            updateFileCount(parentFolder.fileId, 1)
-        }
-        return fileId
-    }
-
-    @Transaction
-    suspend fun deleteFileAndUpdateParent(file: File) {
-        val parentFolder = findParentFolder(file.path, file.fileName, file.projectId)
-            ?: throw IllegalArgumentException("Parent folder not found")
-        updateFileCount(parentFolder.fileId, -1)
-        deleteFile(file.fileId)
-    }
 
     @Query("DELETE FROM files WHERE file_id = :fileId")
     suspend fun deleteFile(fileId: Long)
@@ -253,7 +238,7 @@ interface FileDao {
         WHERE files.path = :path and files.file_name = :fileName AND files.project_id = :projectId
         """
     )
-    suspend fun getRawContentByPath(path: String, fileName:String, projectId: Long): String?
+    suspend fun getRawContentByPath(path: String, fileName: String, projectId: Long): String?
 
     @Query(
         """SELECT
@@ -294,6 +279,80 @@ interface FileDao {
 
     @Query("select count(*) == 0 from files WHERE path = :path AND project_id = :projectId")
     suspend fun isPathEmpty(path: String, projectId: Long): Boolean
+
+    @Update(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun updateFile(file: File)
+
+    @Transaction
+    suspend fun updateFolderName(oldFolderFile: File, fullPath: String) {
+        val newPath = if(fullPath.trim().startsWith("/")){
+            fullPath.substring(1)
+        }else{
+            fullPath.trim()
+        }
+        val oldFolderPath = if (oldFolderFile.path.isNotBlank()) {
+            oldFolderFile.path + "/" + oldFolderFile.fileName
+        } else {
+            oldFolderFile.fileName
+        }
+
+        val newFileName = newPath.substringAfterLast('/')
+        val newFolderPath = newPath.substringBeforeLast('/')
+
+        val updatedFile = oldFolderFile.copy(fileName = newFileName, path = newFolderPath)
+        val oldFolderPathLength = oldFolderPath.length
+
+        updateFile(updatedFile)
+        updateChildPathsByIndex(
+            oldFolderPath,
+            newPath,
+            oldFolderPathLength,
+            oldFolderFile.projectId
+        )
+        addParentFolders(newFolderPath, oldFolderFile.projectId)
+    }
+
+    suspend fun addParentFolders(
+        newFolderPath: String,
+        projectId: Long
+    ) {
+        val pathParts = mutableListOf("")
+        newFolderPath.split("/").forEach {
+            insertFile(
+                File(
+                    fileName = it,
+                    projectId = projectId,
+                    isFile = false,
+                    path = pathParts.joinToString("/")
+                )
+            )
+            pathParts.add(it)
+        }
+    }
+
+    @Query("""
+    INSERT OR REPLACE INTO files
+    SELECT 
+        file_id,
+        project_id,
+        CASE 
+            WHEN LENGTH(path) > :oldFolderPathLength 
+            THEN :newFolderPath || SUBSTR(path, :oldFolderPathLength + 1) 
+            ELSE :newFolderPath 
+        END AS path,
+        file_name,
+        is_file,
+        size
+    FROM files
+    WHERE path LIKE :oldFolderPath || '%' 
+    AND project_id = :projectId
+""")
+    suspend fun updateChildPathsByIndex(
+        oldFolderPath: String,
+        newFolderPath: String,
+        oldFolderPathLength: Int,
+        projectId: Long
+    )
 }
 
 data class FileData(

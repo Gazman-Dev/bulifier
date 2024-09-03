@@ -161,9 +161,6 @@ data class File(
 
     @ColumnInfo(name = "size")
     val size: Int = 0,
-
-    @ColumnInfo(name = "file_count")
-    val filesCount: Int = 0
 )
 
 @Entity(
