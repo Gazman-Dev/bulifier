@@ -284,6 +284,12 @@ interface FileDao {
     suspend fun updateFile(file: File)
 
     @Transaction
+    suspend fun updateFileName(newFile: File) {
+        updateFile(newFile)
+        addParentFolders(newFile.path, newFile.projectId)
+    }
+
+    @Transaction
     suspend fun updateFolderName(oldFolderFile: File, fullPath: String) {
         val newPath = if(fullPath.trim().startsWith("/")){
             fullPath.substring(1)
@@ -316,8 +322,9 @@ interface FileDao {
         newFolderPath: String,
         projectId: Long
     ) {
-        val pathParts = mutableListOf("")
-        newFolderPath.split("/").forEach {
+        val pathParts = mutableListOf<String>()
+        val parts = newFolderPath.split("/")
+        parts.forEach {
             insertFile(
                 File(
                     fileName = it,

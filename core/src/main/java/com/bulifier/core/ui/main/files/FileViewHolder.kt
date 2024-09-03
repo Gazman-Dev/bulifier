@@ -49,7 +49,7 @@ class FileViewHolder(
                         file?.let { file ->
                             val title = if (file.isFile) "Rename file" else "Rename folder"
                             val text = when {
-                                file.isFile || file.path.isBlank() -> file.fileName
+                                file.path.isBlank() -> file.fileName
                                 else -> file.path + "/" + file.fileName
                             }
                             showTextDialog(binding.root.context, text= text, title = title) {

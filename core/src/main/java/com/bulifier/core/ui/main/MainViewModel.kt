@@ -216,7 +216,15 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     fun renameFile(file: File, newFileNameOrPath: String) = try {
         viewModelScope.launch {
             if (file.isFile) {
-                db.updateFile(file.copy(fileName = newFileNameOrPath))
+                val newPath = if(newFileNameOrPath.trim().startsWith("/")){
+                    newFileNameOrPath.substring(1)
+                }else{
+                    newFileNameOrPath.trim()
+                }
+
+                val newFileName = newPath.substringAfterLast('/')
+                val newFilePath = newPath.substringBeforeLast('/')
+                db.updateFileName(file.copy(fileName = newFileName, path = newFilePath))
             }
             else{
                 db.updateFolderName(file, newFileNameOrPath)
