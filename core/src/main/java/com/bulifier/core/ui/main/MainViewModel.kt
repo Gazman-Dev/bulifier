@@ -157,7 +157,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val projectId = projectId.value ?: return@launch
             val path = path.value ?: projectName.value ?: return@launch
-            db.insertFileAndUpdateParent(
+            db.insertFile(
                 File(
                     fileName = fileName,
                     projectId = projectId,
@@ -175,7 +175,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
             val extraPathParts = mutableListOf<String>()
             val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
             folderName.split("[^a-zA-Z0-9]".toRegex()).forEach {
-                db.insertFileAndUpdateParent(
+                db.insertFile(
                     File(
                         fileName = it,
                         projectId = projectId,
@@ -213,5 +213,37 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         db.deleteProject(project)
     }
 
+    fun renameFile(file: File, newFileNameOrPath: String) = try {
+        viewModelScope.launch {
+            if (file.isFile) {
+                val newPath = if(newFileNameOrPath.trim().startsWith("/")){
+                    newFileNameOrPath.substring(1)
+                }else{
+                    newFileNameOrPath.trim()
+                }
 
+                val newFileName = newPath.substringAfterLast('/')
+                val newFilePath = newPath.substringBeforeLast('/')
+                db.updateFileName(file.copy(fileName = newFileName, path = newFilePath))
+            }
+            else{
+                db.updateFolderName(file, newFileNameOrPath)
+            }
+        }
+        true
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false
+    }
+
+    fun deleteFile(file: File) {
+        viewModelScope.launch {
+            if(file.isFile) {
+                db.deleteFile(file.fileId)
+            }
+            else{
+                db.deleteFolder(file.fileId, file.path + "/" + file.fileName)
+            }
+        }
+    }
 }
