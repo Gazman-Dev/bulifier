@@ -235,4 +235,15 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         e.printStackTrace()
         false
     }
+
+    fun deleteFile(file: File) {
+        viewModelScope.launch {
+            if(file.isFile) {
+                db.deleteFile(file.fileId)
+            }
+            else{
+                db.deleteFolder(file.fileId, file.path + "/" + file.fileName)
+            }
+        }
+    }
 }

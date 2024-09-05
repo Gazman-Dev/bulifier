@@ -33,19 +33,13 @@ class FileViewHolder(
 
     private fun showMenu() {
         val options = mutableListOf(
-            "Rename",
-            "Copy",
-            "Cut",
-        ).apply {
-            if(file?.isFile == false) {
-                add("Paste")
-            }
-            add("Delete")
-        }
+            "Rename/Move",
+            "Delete"
+        )
         AlertDialog.Builder(binding.root.context)
             .setItems(options.toTypedArray()) { _, which ->
                 when (options[which]) {
-                    "Rename" -> {
+                    "Rename/Move" -> {
                         file?.let { file ->
                             val title = if (file.isFile) "Rename file" else "Rename folder"
                             val text = when {
@@ -59,10 +53,11 @@ class FileViewHolder(
                             }
                         }
                     }
-                    "Copy" -> Unit
-                    "Cut" -> Unit
-                    "Paste" -> Unit
-                    "Delete" -> Unit
+                    "Delete" -> {
+                        file?.let { file ->
+                            viewModel.deleteFile(file)
+                        }
+                    }
                     else -> throw Error("Options got messed up")
                 }
             }

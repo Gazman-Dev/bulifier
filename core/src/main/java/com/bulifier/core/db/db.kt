@@ -183,6 +183,9 @@ interface FileDao {
     @Query("DELETE FROM files WHERE file_id = :fileId")
     suspend fun deleteFile(fileId: Long)
 
+    @Query("DELETE FROM files WHERE file_id = :fileId or path = :path or path like :path || '/%'")
+    suspend fun deleteFolder(fileId: Long, path: String)
+
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertProject(project: Project): Long
 
