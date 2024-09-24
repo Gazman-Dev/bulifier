@@ -2,9 +2,9 @@ package com.bulifier.core.ui.content
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.text.InputType
 import android.text.TextWatcher
 import android.text.method.ScrollingMovementMethod
+import android.util.Log
 import android.view.GestureDetector
 import android.view.LayoutInflater
 import android.view.MotionEvent
@@ -13,11 +13,13 @@ import android.view.ViewGroup
 import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreFileContentFragmentBinding
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.main.MainViewModel
+import kotlinx.coroutines.launch
 
 class FileContentFragment : Fragment() {
 
@@ -38,7 +40,7 @@ class FileContentFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         binding.ai.setOnClickListener {
-            viewModel.fullPath.value?.run {
+            viewModel.fullPath.value.run {
                 historyViewModel.createNewAiJob(path, fileName)
             }
             findNavController().navigate(R.id.aiHistoryFragment)
@@ -46,12 +48,18 @@ class FileContentFragment : Fragment() {
         var text = ""
         binding.textBox.movementMethod = ScrollingMovementMethod()
         binding.textBoxView.movementMethod = ScrollingMovementMethod()
-        viewModel.fileContent.observe(viewLifecycleOwner) {
-            if(text != it) {
-                binding.textBox.setText(it)
-                binding.textBoxView.text = it
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.fileContent.collect {
+                if (text != it) {
+                    Log.d("FileContentFragment", "Text is different ${it.length}")
+                    binding.textBox.setText(it)
+                    binding.textBoxView.text = it
+                } else {
+                    Log.d("FileContentFragment", "Text is the same ${it.length}")
+                }
             }
         }
+
         binding.textBox.addTextChangedListener(object : TextWatcher {
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
@@ -66,6 +74,8 @@ class FileContentFragment : Fragment() {
                 val newText = s.toString()
                 dirty = text != newText
                 text = newText
+
+                Log.d("FileContentFragment", "Text updated ${newText.length}")
             }
         })
 
@@ -80,6 +90,7 @@ class FileContentFragment : Fragment() {
         Ticker(viewLifecycleOwner) {
             if (dirty) {
                 viewModel.updateFileContent(binding.textBox.text.toString())
+                Log.d("FileContentFragment", "viewModel updated")
             }
             dirty = false
         }

@@ -16,6 +16,7 @@ import androidx.room.Room
 import androidx.room.Transaction
 import androidx.room.Update
 import com.bulifier.core.db.Content.Type
+import kotlinx.coroutines.flow.Flow
 
 val Context.db: AppDatabase
     get() = getDatabase(this)
@@ -98,7 +99,7 @@ interface HistoryDao {
     fun getHistoryByStatuses(
         statuses: List<HistoryStatus>,
         projectId: Long
-    ): LiveData<List<HistoryItem>>
+    ): Flow<List<HistoryItem>>
 
     @Delete
     suspend fun deleteHistoryItem(history: HistoryItem)

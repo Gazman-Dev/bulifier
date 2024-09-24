@@ -2,8 +2,9 @@ package com.bulifier.core.prefs
 
 import android.app.Application
 import android.content.SharedPreferences
-import androidx.lifecycle.LiveData
 import com.bulifier.core.prefs.Prefs.pref
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 
 object Prefs {
     internal lateinit var pref: SharedPreferences
@@ -28,66 +29,52 @@ object Prefs {
 
 class PrefStringValue(
     private val key: String
-) :
-    LiveData<String>() {
+) {
+    // Default to an empty string if no value is found
+    private val _valueFlow = MutableStateFlow(pref.getString(key, "") ?: "")
 
-    init {
-        pref.getString(key, null)?.let {
-            value = it
-        }
-    }
+    val flow: StateFlow<String> = _valueFlow
 
     internal fun set(value: String) {
         pref.edit().putString(key, value).apply()
-        super.setValue(value)
+        _valueFlow.value = value
     }
 }
 
 class PrefListValue(
     private val key: String
-) : LiveData<List<String>>() {
+) {
+    // Default to an empty list if no value is found
+    private val _valueFlow = MutableStateFlow(pref.getString(key, "")?.split("\t") ?: emptyList())
 
-    init {
-        pref.getString(key, null)?.let {
-            // there are no tabs on the mobile keyboard so less likely to collide
-            value = it.split("\t")
-        }
-    }
+    val flow: StateFlow<List<String>> = _valueFlow
 
-    internal fun set(value: List<String>?) {
-        pref.edit().putString(key, value?.joinToString("\t")).apply()
-        super.setValue(value)
+    fun set(value: List<String>?) {
+        pref.edit().putString(key, value?.joinToString("\t") ?: "").apply()
+        _valueFlow.value = value ?: emptyList()
     }
 }
 
-class PrefIntValue(private val key: String) :
-    LiveData<Int>() {
+class PrefIntValue(private val key: String) {
+    // Default to -1 if no value is found
+    private val _valueFlow = MutableStateFlow(pref.getInt(key, -1))
 
-    init {
-        val v = pref.getInt(key, -1)
-        if (v != -1) {
-            value = v
-        }
-    }
+    val flow: StateFlow<Int> = _valueFlow
 
     internal fun set(value: Int) {
         pref.edit().putInt(key, value).apply()
-        super.setValue(value)
+        _valueFlow.value = value
     }
 }
 
-class PrefLongValue(private val key: String) :
-    LiveData<Long>() {
+class PrefLongValue(private val key: String) {
+    // Default to -1L if no value is found
+    private val _valueFlow = MutableStateFlow(pref.getLong(key, -1L))
 
-    init {
-        val v = pref.getLong(key, -1)
-        if (v != -1L) {
-            value = v
-        }
-    }
+    val flow: StateFlow<Long> = _valueFlow
 
     internal fun set(value: Long) {
         pref.edit().putLong(key, value).apply()
-        super.setValue(value)
+        _valueFlow.value = value
     }
 }

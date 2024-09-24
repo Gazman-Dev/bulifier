@@ -3,8 +3,6 @@ package com.bulifier.core.ui.ai
 import android.app.Application
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.MediatorLiveData
-import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -16,50 +14,57 @@ import com.bulifier.core.db.HistoryStatus
 import com.bulifier.core.db.db
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.projectId
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
-    private val detailedItem = MutableLiveData<HistoryItem?>()
+    private val detailedItem = MutableStateFlow<HistoryItem?>(null)
 
     private val historyDb by lazy { app.db.historyDao() }
     private val filesDb by lazy { app.db.fileDao() }
 
+    private var pagingJob: Job? = null
+
     val selectedSchema: String?
         get() = detailedItem.value?.schema
 
-    val historySource by lazy {
-        MediatorLiveData<PagingData<HistoryItemWithSelection>>().apply {
-            addSource(projectId) { newProjectId ->
-                updatePagingData("projectId", detailedItem.value?.promptId, newProjectId)
-            }
+    private val _historySource =
+        MutableStateFlow<PagingData<HistoryItemWithSelection>>(PagingData.empty())
+    val historySource: StateFlow<PagingData<HistoryItemWithSelection>> = _historySource
 
-            addSource(detailedItem) { detailedItem ->
-                updatePagingData("detailedItem", detailedItem?.promptId, projectId.value)
+    init {
+        // Combine projectId and detailedItem flows and update the paging data when either changes
+        viewModelScope.launch {
+            combine(projectId.flow, detailedItem) { newProjectId, detailedItem ->
+                Pair(newProjectId, detailedItem?.promptId)
+            }.collect { (newProjectId, promptId) ->
+                updatePagingData(newProjectId, promptId)
             }
         }
     }
 
-    private var lastUpdate: Pair<Long?, Long?>? = null
-    private fun updatePagingData(source: String, promptId: Long?, projectId: Long?) {
-//        val ignoreUpdate = lastUpdate?.first == promptId && lastUpdate?.second == projectId
-//        if (ignoreUpdate) {
-//            return
-//        }
-//        lastUpdate = Pair(promptId, projectId)
-        viewModelScope.launch {
-            ("source=$source, promptId=$promptId, projectId=$projectId model= ${this@HistoryViewModel}\n"
-                    + historyDb.getHistoryDebug(promptId ?: -1, projectId ?: -1).joinToString("\n") {
-                "promptId=${it.historyItem.promptId}, projectId=${it.historyItem.projectId} selected=${it.selected}"
-            }).run {
-                Log.d("HistoryViewModel", "updatePagingData: $this")
-            }
+    private fun updatePagingData(projectId: Long, promptId: Long?) {
+        pagingJob?.cancel()
+        pagingJob = viewModelScope.launch {
+            Log.d(
+                "HistoryViewModel",
+                "promptId=$promptId, projectId=$projectId model= ${this@HistoryViewModel}\n" +
+                        historyDb.getHistoryDebug(promptId ?: -1, projectId)
+                            .joinToString("\n") {
+                                "promptId=${it.historyItem.promptId}, projectId=${it.historyItem.projectId} selected=${it.selected}"
+                            }
+            )
+
             Pager(
                 config = PagingConfig(pageSize = 20),
                 pagingSourceFactory = {
-                    historyDb.getHistory(promptId ?: -1, projectId ?: -1)
+                    historyDb.getHistory(promptId ?: -1, projectId)
                 }
             ).flow.cachedIn(viewModelScope).collect {
-                historySource.value = it
+                _historySource.value = it
             }
         }
     }
@@ -74,43 +79,31 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun discard() {
         Log.d("HistoryViewModel", "discard: ${detailedItem.value}")
-        detailedItem.apply {
-            val item = value
-            if (item != null) {
-                viewModelScope.launch {
-                    historyDb.deleteHistoryItem(item)
-                    value = null
-                }
+        viewModelScope.launch {
+            detailedItem.value?.let {
+                historyDb.deleteHistoryItem(it)
+                detailedItem.value = null
             }
         }
     }
 
     fun saveToDraft() {
         Log.d("HistoryViewModel", "saveToDraft: ${detailedItem.value}")
-        detailedItem.apply {
-            viewModelScope.launch {
-                value?.let {
-                    historyDb.updateHistory(it)
-                }
-                value = null
+        viewModelScope.launch {
+            detailedItem.value?.let {
+                historyDb.updateHistory(it)
             }
+            detailedItem.emit(null)
         }
     }
 
     fun updateModelKey(model: String) {
-        if(detailedItem.value?.modelId == model) {
-            return
-        }
+        if (detailedItem.value?.modelId == model) return
         Log.d("HistoryViewModel", "updateModelKey: $model")
-        detailedItem.apply {
-            val historyItem = value
-            if (historyItem != null) {
-                value = historyItem.copy(
-                    modelId = model
-                )
-                viewModelScope.launch {
-                    historyDb.updateHistory(historyItem)
-                }
+        detailedItem.value?.let { historyItem ->
+            detailedItem.value = historyItem.copy(modelId = model)
+            viewModelScope.launch {
+                historyDb.updateHistory(historyItem.copy(modelId = model))
             }
         }
     }
@@ -124,33 +117,30 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
         Log.d("HistoryViewModel", "createNewAiJob: $pathWithProjectName, $fileName")
         val path = dropProjectName(pathWithProjectName)
         viewModelScope.launch {
-            val schema = if (fileName != null) {
-                HistoryItem.SCHEMA_REBULIFY_FILE
-            } else if (filesDb.isPathEmpty(path, projectId.value!!)) {
-                HistoryItem.SCHEMA_BULLIFY
-            } else {
-                HistoryItem.SCHEMA_DEBULIFY
+            val schema = when {
+                fileName != null -> HistoryItem.SCHEMA_REBULIFY_FILE
+                filesDb.isPathEmpty(path, projectId.flow.value) -> HistoryItem.SCHEMA_BULLIFY
+                else -> HistoryItem.SCHEMA_DEBULIFY
             }
 
-            val filesContext = if (fileName != null) {
-                filesDb.getRawContentByPath(path, fileName, projectId.value!!)?.run {
+            val filesContext = fileName?.let {
+                filesDb.getRawContentByPath(path, fileName, projectId.flow.value)?.run {
                     extractImports(this)
                 } ?: emptyList()
-            } else {
-                emptyList()
-            }.mapNotNull {
+            }?.mapNotNull {
                 val (importPath, importFileName) = parseImport(it)
-                filesDb.getFileId(importPath, importFileName, projectId.value!!)
-            }
+                filesDb.getFileId(importPath, importFileName, projectId.flow.value)
+            } ?: emptyList()
 
             val historyItem = HistoryItem(
                 path = path,
                 fileName = fileName,
                 schema = schema,
                 contextFiles = filesContext,
-                modelId = Prefs.models.value?.firstOrNull()
+                modelId = Prefs.models.flow.value.firstOrNull()
             )
             val id = historyDb.addHistory(historyItem)
+            Log.d("HistoryViewModel", "createNewAiJob: id: $id path: $pathWithProjectName, $fileName")
             detailedItem.value = historyItem.copy(promptId = id)
         }
     }
@@ -163,43 +153,38 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     private fun extractImports(fileContent: String): List<String> {
-        val lines = fileContent.lines()
-        val trimmed = lines.map { it.trim() }
-        val filtered = trimmed.filter { it.startsWith("import") }
-        val remapped = filtered.map { it.substringAfter("import").trim() }
-        return remapped
+        return fileContent.lines()
+            .map { it.trim() }
+            .filter { it.startsWith("import") }
+            .map { it.substringAfter("import").trim() }
     }
 
-    private fun dropProjectName(p: String) = p.replace((Prefs.projectName.value ?: "") + "/", "")
+    private fun dropProjectName(p: String) = p.replace("${Prefs.projectName.flow.value}/", "")
 
     fun send(prompt: String) {
         Log.d("HistoryViewModel", "send: $prompt")
         viewModelScope.launch {
-            detailedItem.apply {
-                val historyItem = value
-                value = null
-                historyItem?.apply {
-                    historyDb.updateHistory(
-                        copy(
-                            status = if(status == HistoryStatus.RESPONDED){
-                                HistoryStatus.RE_APPLYING
-                            } else {
-                                HistoryStatus.SUBMITTED
-                            },
-                            prompt = prompt
-                        )
+            detailedItem.value?.let { historyItem ->
+                detailedItem.value = null
+                historyDb.updateHistory(
+                    historyItem.copy(
+                        status = if (historyItem.status == HistoryStatus.RESPONDED) {
+                            HistoryStatus.RE_APPLYING
+                        } else {
+                            HistoryStatus.SUBMITTED
+                        },
+                        prompt = prompt
                     )
-                }
-
+                )
             }
         }
     }
 
     fun updatePrompt(prompt: String?) {
         Log.d("HistoryViewModel", "updatePrompt: $prompt")
-        detailedItem.value?.apply {
-            if (this.prompt != prompt) {
-                detailedItem.value = copy(prompt = prompt ?: "")
+        detailedItem.value?.let {
+            if (it.prompt != prompt) {
+                detailedItem.value = it.copy(prompt = prompt ?: "")
             }
         }
     }

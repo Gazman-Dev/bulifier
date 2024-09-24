@@ -1,7 +1,6 @@
 package com.bulifier.core.api
 
 import androidx.lifecycle.LifecycleService
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.db.Content
 import com.bulifier.core.db.File
@@ -30,8 +29,9 @@ class AiService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
 
-        val observer: (value: List<HistoryItem>) -> Unit = {
-            it.forEach { historyItem ->
+        // Flow collector for observing changes
+        val collector: suspend (List<HistoryItem>) -> Unit = { historyItems ->
+            historyItems.forEach { historyItem ->
                 if (historyItem.modelId == null) {
                     lifecycleScope.launch {
                         db.historyDao()
@@ -57,17 +57,17 @@ class AiService : LifecycleService() {
             }
         }
 
-        var historyByStatus: LiveData<List<HistoryItem>>? = null
-        Prefs.projectId.observe(this) {
-            historyByStatus?.removeObserver(observer)
-            historyByStatus =
+        // Collect the projectId Flow and handle the data
+        lifecycleScope.launch {
+            Prefs.projectId.flow.collect { projectId ->
                 db.historyDao().getHistoryByStatuses(
                     statuses = listOf(
                         HistoryStatus.SUBMITTED,
                         HistoryStatus.RE_APPLYING
-                    ), projectId = it
-                )
-            historyByStatus?.observe(this, observer)
+                    ),
+                    projectId = projectId
+                ).collect(collector) // Collecting the flow of history items
+            }
         }
     }
 
@@ -97,49 +97,35 @@ class AiService : LifecycleService() {
         filesContext: List<FileData>,
         historyItem: HistoryItem,
         responses: List<ResponseItem>?
-    ) =
-        withContext(Dispatchers.IO) {
-            val model = loadModel(historyItem)
-            val fileData =
-                db.fileDao()
-                    .getContent(historyItem.path, historyItem.fileName!!, historyItem.projectId)
-                    ?: return@withContext
-            val response = responses?.firstOrNull()?.run {
-                ResponseData(historyItem, response).also {
-                    val newHistoryItem = historyItem.copy(
-                        status = HistoryStatus.RESPONDED
-                    )
-                    db.historyDao().updateHistory(
-                        newHistoryItem.copy(status = HistoryStatus.RESPONDED)
-                    )
-                }
-            } ?: kotlin.run {
-                val schemas: List<Schema> = prepareSchema(
-                    historyItem.schema,
-                    userPrompt = historyItem.prompt,
-                    packageName = historyItem.path,
-                    filesContext = filesContext.map {
-                        """file name: 
-                    ${it.fileName}
-                    
-                    file content: 
-                    ${it.content}
-                """.trimIndent()
-                    },
-                    fileContent = fileData
-                )
+    ) = withContext(Dispatchers.IO) {
+        val model = loadModel(historyItem)
+        val fileData =
+            db.fileDao().getContent(historyItem.path, historyItem.fileName!!, historyItem.projectId)
+                ?: return@withContext
+        val response = responses?.firstOrNull()?.run {
+            ResponseData(historyItem, response).also {
+                val newHistoryItem = historyItem.copy(status = HistoryStatus.RESPONDED)
+                db.historyDao().updateHistory(newHistoryItem)
+            }
+        } ?: run {
+            val schemas: List<Schema> = prepareSchema(
+                historyItem.schema,
+                userPrompt = historyItem.prompt,
+                packageName = historyItem.path,
+                filesContext = filesContext.map {
+                    """file name: ${it.fileName} file content: ${it.content}""".trimIndent()
+                },
+                fileContent = fileData
+            )
 
-                val messages = toMessages(schemas)
-                sendMessages(model, messages, historyItem)
-            }
-            if (response != null) {
-                db.fileDao().insertContentAndUpdateFileSize(
-                    fileData
-                        .toContent()
-                        .copy(content = response.response)
-                )
-            }
+            val messages = toMessages(schemas)
+            sendMessages(model, messages, historyItem)
         }
+        response?.let {
+            db.fileDao()
+                .insertContentAndUpdateFileSize(fileData.toContent().copy(content = it.response))
+        }
+    }
 
     private suspend fun handleDebulify(historyItem: HistoryItem, responses: List<ResponseItem>?) =
         withContext(Dispatchers.IO) {
@@ -190,59 +176,42 @@ class AiService : LifecycleService() {
         historyItem: HistoryItem
     ): ResponseData? {
         val response = try {
-            model.createApiModel().sendMessage(
-                MessageRequest(
-                    messages
-                )
-            ) ?: run {
-                db.historyDao().markError(historyItem.promptId, "No response")
-                return null
-            }
+            model.createApiModel().sendMessage(MessageRequest(messages))
+                ?: run {
+                    db.historyDao().markError(historyItem.promptId, "No response")
+                    return null
+                }
         } catch (e: Exception) {
             e.printStackTrace()
-            val errorMessage = e.message ?: "Unknown error"
-            db.historyDao().markError(historyItem.promptId, errorMessage)
+            db.historyDao().markError(historyItem.promptId, e.message ?: "Unknown error")
 
             val responseItem = ResponseItem(
                 promptId = historyItem.promptId,
                 request = Gson().toJson(messages),
-                response = errorMessage
+                response = e.message ?: "Unknown error"
             )
-
-            db.historyDao().addResponse(
-                responseItem
-            )
+            db.historyDao().addResponse(responseItem)
             return null
         }
 
         val responseItem = ResponseItem(
             promptId = historyItem.promptId,
-            request = Gson().toJson(messages)
+            request = Gson().toJson(messages),
+            response = response
         )
 
-        val responseId = db.historyDao().addResponse(
-            responseItem
-        )
+        val responseId = db.historyDao().addResponse(responseItem)
 
-        val newHistoryItem = historyItem.copy(
-            status = HistoryStatus.RESPONDED
-        )
-
-        db.historyDao().updateHistory(
-            newHistoryItem, responseItem.copy(
-                id = responseId,
-                response = response
-            )
-        )
+        val newHistoryItem = historyItem.copy(status = HistoryStatus.RESPONDED)
+        db.historyDao().updateHistory(newHistoryItem)
 
         return ResponseData(historyItem, response)
     }
 
     private suspend fun applyDebulifyResponse(responseData: ResponseData, file: File) {
         val projectId = responseData.historyItem.projectId
-        val fileName = (extractNewFileName(responseData.response, file.fileName) ?: "").ifBlank {
-            throw Error("Couldn't extract file name from response \n${responseData.response} \n${file.fileName}")
-        }
+        val fileName = extractNewFileName(responseData.response, file.fileName)
+            ?: throw Error("Couldn't extract file name from response\n${responseData.response}\n${file.fileName}")
 
         val fileId = db.fileDao().insertFile(
             File(
@@ -262,19 +231,14 @@ class AiService : LifecycleService() {
     }
 
     private fun extractNewFileName(codeInput: String, inputFileName: String): String? {
-        // Extract the base name (without extension) from the input file name
         val baseName = inputFileName.lowercase().substringBeforeLast(".")
-
-        // Extract the new extension from the first line of the code
         codeInput.trim().lowercase().split("\n").forEach { line ->
             val extensionPattern = """\.(\w+)""".toRegex()
             val matchResult = extensionPattern.find(line)
-
             if (matchResult != null) {
                 return "$baseName.${matchResult.groupValues[1].lowercase()}"
             }
         }
-
         return null
     }
 
@@ -289,16 +253,11 @@ class AiService : LifecycleService() {
 
     private suspend fun applyBulifyResponse(responseData: ResponseData) {
         val projectId = responseData.historyItem.projectId
-
         val files = responseProcessor.parseResponse(responseData.response)
         files.forEach { item ->
             val pathParts = item.fullPath.split("/").toMutableList()
             val fileName = pathParts.removeLast().run {
-                if (this.endsWith(".bul")) {
-                    this
-                } else {
-                    split(".")[0] + ".bul"
-                }
+                if (this.endsWith(".bul")) this else split(".")[0] + ".bul"
             }
 
             val path = pathParts.joinToString("/")
@@ -313,15 +272,7 @@ class AiService : LifecycleService() {
             db.fileDao().insertContentAndUpdateFileSize(
                 Content(
                     fileId = fileId,
-                    content = item.imports.run {
-                        if (this.isEmpty()) {
-                            ""
-                        } else {
-                            this.joinToString("\n") {
-                                "import $it"
-                            } + "\n\n"
-                        }
-                    } + item.content,
+                    content = item.imports.joinToString("\n") { "import $it" } + "\n\n" + item.content,
                     type = Content.Type.BULLET
                 )
             )
@@ -329,17 +280,9 @@ class AiService : LifecycleService() {
     }
 
     private fun toMessages(schemas: List<Schema>): List<MessageData> {
-        val messages = schemas.map {
-            MessageData(
-                if (it.type != SchemaType.USER) {
-                    "system"
-                } else {
-                    "user"
-                },
-                it.content
-            )
+        return schemas.map {
+            MessageData(if (it.type != SchemaType.USER) "system" else "user", it.content)
         }
-        return messages
     }
 
     private suspend fun prepareSchema(
@@ -348,34 +291,35 @@ class AiService : LifecycleService() {
         filesContext: List<String>? = null,
         fileContent: FileData? = null
     ) = withContext(Dispatchers.Default) {
-        getSchemas(name).map { schema ->
+        getSchemas(name).flatMap { schema ->
             if (schema.type == SchemaType.CONTEXT) {
-                val list = mutableListOf<Schema>()
-                filesContext?.forEach {
-                    val content = updateSchemaContent(
-                        schema.content,
-                        schema.keys, userPrompt, packageName, fileContent
-                    ).replace("{$KEY_CONTEXT}", it)
-
-                    list.add(
-                        schema.copy(
-                            content = content
+                filesContext?.map {
+                    schema.copy(
+                        content = updateSchemaContent(
+                            schema.content,
+                            schema.keys,
+                            userPrompt,
+                            packageName,
+                            fileContent
                         )
+                            .replace("{$KEY_CONTEXT}", it)
                     )
-                }
-                list
+                } ?: emptyList()
             } else {
                 listOf(
                     schema.copy(
                         content = updateSchemaContent(
                             schema.content,
-                            schema.keys, userPrompt, packageName, fileContent
+                            schema.keys,
+                            userPrompt,
+                            packageName,
+                            fileContent
                         )
                     )
                 )
             }
         }
-    }.flatten()
+    }
 
     private suspend fun getSchemas(name: String) = db.schemaDao().getSchema(name)
 
@@ -394,7 +338,7 @@ class AiService : LifecycleService() {
             result = result.replace("{$KEY_PROMPT}", userPrompt)
         }
         if (keys.contains(KEY_BULLET_FILE)) {
-            result = result.replace("{$KEY_BULLET_FILE}", fileContent!!.content)
+            result = result.replace("{$KEY_BULLET_FILE}", fileContent?.content ?: "")
         }
         return result
     }

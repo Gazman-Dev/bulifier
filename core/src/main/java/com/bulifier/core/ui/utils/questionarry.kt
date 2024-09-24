@@ -4,9 +4,9 @@ import android.content.Context
 import android.text.InputType
 import android.widget.EditText
 import androidx.appcompat.app.AlertDialog
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MutableLiveData
 import com.bulifier.core.models.QuestionsModel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 
 data class Question(
     val title: String,
@@ -16,8 +16,8 @@ data class Question(
 )
 
 
-fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveData<Boolean> {
-    val liveData: MutableLiveData<Boolean> = MutableLiveData()
+fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): Flow<Boolean> {
+    val flow = MutableStateFlow(false)
     var currentIndex = 0
 
     fun showDialog() {
@@ -30,7 +30,7 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveD
             val input = EditText(context)
             input.inputType = InputType.TYPE_CLASS_TEXT
             input.setText(currentQuestion.response)
-            if(currentQuestion.isPassword){
+            if (currentQuestion.isPassword) {
                 input.inputType = input.inputType or InputType.TYPE_TEXT_VARIATION_PASSWORD
             }
             dialogBuilder.setView(input)
@@ -42,7 +42,7 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveD
                     showDialog()
                 } else {
                     questionsModel.serialize()
-                    liveData.value = true
+                    flow.value = true
                 }
             }
         } else {
@@ -61,7 +61,7 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveD
                         showDialog()
                     } else {
                         questionsModel.serialize()
-                        liveData.value = true
+                        flow.value = true
                     }
                 }
             }
@@ -75,13 +75,13 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveD
         } else {
             // Only for the first question
             dialogBuilder.setNegativeButton("Cancel") { _, _ ->
-                liveData.value = false
+                flow.value = false
             }
         }
 
         dialogBuilder.setCancelable(true)
         dialogBuilder.setOnCancelListener {
-            liveData.value = false
+            flow.value = false
         }
 
         val dialog = dialogBuilder.create()
@@ -89,5 +89,5 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): LiveD
     }
 
     showDialog()
-    return liveData
+    return flow
 }

@@ -218,7 +218,7 @@ data class HistoryItem(
     val contextFiles: List<Long> = emptyList(),
 
     @ColumnInfo(name = "schema")
-    val schema:String = SCHEMA_BULLIFY,
+    val schema: String = SCHEMA_BULLIFY,
 
     @ColumnInfo(name = "path")
     val path: String,
@@ -227,7 +227,7 @@ data class HistoryItem(
     val fileName: String?,
 
     @ColumnInfo(name = "project_id")
-    val projectId: Long = Prefs.projectId.value!!,
+    val projectId: Long = Prefs.projectId.flow.value,
 
     @ColumnInfo(name = "error_message")
     val errorMessage: String? = null,
