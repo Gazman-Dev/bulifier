@@ -46,7 +46,8 @@ abstract class BaseHistoryViewHolder(
         binding.status.text = when (historyItem?.status) {
             HistoryStatus.ERROR -> "Error"
             HistoryStatus.PROMPTING -> "Prompting"
-            HistoryStatus.SUBMITTED -> "Loading"
+            HistoryStatus.SUBMITTED -> "Submitted"
+            HistoryStatus.PROCESSING -> "Loading"
             HistoryStatus.RESPONDED -> "Success"
             HistoryStatus.RE_APPLYING -> "Re-Applying"
             null -> "---"

@@ -1,9 +1,11 @@
 package com.bulifier.core.ui.ai
 
 import android.os.Bundle
+import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.compose.ui.util.fastForEachIndexed
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.fragment.findNavController
@@ -14,6 +16,8 @@ import com.bulifier.core.ui.ai.history_adapter.HistoryAdapter
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.MainViewModel
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -30,15 +34,18 @@ class AiHistoryFragment : BaseFragment<CoreAiHistoryFragmentBinding>() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        Log.d("PagingAdapter", "AiHistoryFragment onViewCreated")
         viewLifecycleOwner.lifecycleScope.launch {
-            val schemas = withContext(Dispatchers.IO){
+            val schemas = withContext(Dispatchers.IO) {
                 SchemaModel.getSchemaNames()
             }
             adapter = HistoryAdapter(viewModel, binding.historyList, schemas, viewLifecycleOwner)
-            viewModel.historySource.observe(viewLifecycleOwner) {
-                adapter.submitData(viewLifecycleOwner.lifecycle, it)
-            }
             binding.historyList.adapter = adapter
+            Log.d("PagingAdapter", "New emission from historySource")
+            viewModel.historySource.collectLatest { pagingData ->
+                Log.d("PagingAdapter", "Submitting new PagingData: $pagingData")
+                adapter.submitData(viewLifecycleOwner.lifecycle, pagingData)
+            }
         }
 
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
@@ -46,20 +53,11 @@ class AiHistoryFragment : BaseFragment<CoreAiHistoryFragmentBinding>() {
             findNavController().popBackStack()
         }
         binding.toolbar.newButton.setOnClickListener {
-            mainViewModel.fullPath.value?.run {
+            mainViewModel.fullPath.value.run {
                 viewModel.createNewAiJob(path, fileName)
             }
         }
     }
-
-//    override fun onResume() {
-//        viewModel.historySource.value?.let {
-//            if(binding.historyList.adapter != null) {
-//                adapter.submitData(viewLifecycleOwner.lifecycle, it)
-//            }
-//        }
-//        super.onResume()
-//    }
 
     override fun onStop() {
         viewModel.saveToDraft()

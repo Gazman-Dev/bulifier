@@ -22,7 +22,6 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreMainFragmentBinding
-import com.bulifier.core.db.FileData
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
@@ -90,16 +89,18 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = filesAdapter
 
-        viewModel.openedFile.observe(viewLifecycleOwner) {
-            val showFileContent = it != null
-            binding.recyclerView.isVisible = !showFileContent
-            binding.fileContent.isVisible = showFileContent
-            binding.bottomBar.toolbar.isVisible = !showFileContent
-        }
-
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.pagingDataFlow.observe(viewLifecycleOwner) { pagingData ->
-                if (pagingData != null) {
+            launch {
+                viewModel.openedFile.collect {
+                    val showFileContent = it != null
+                    binding.recyclerView.isVisible = !showFileContent
+                    binding.fileContent.isVisible = showFileContent
+                    binding.bottomBar.toolbar.isVisible = !showFileContent
+                }
+            }
+
+            launch {
+                viewModel.pagingDataFlow.collect { pagingData ->
                     filesAdapter.submitData(lifecycle, pagingData)
                 }
             }
@@ -109,8 +110,10 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
     }
 
     private fun registerPath() {
-        viewModel.fullPath.observe(viewLifecycleOwner) {
-            updatePath(it.path, it.fileName)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.fullPath.collect {
+                updatePath(it.path, it.fileName)
+            }
         }
     }
 

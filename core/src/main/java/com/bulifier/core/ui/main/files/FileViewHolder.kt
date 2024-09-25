@@ -32,32 +32,41 @@ class FileViewHolder(
     }
 
     private fun showMenu() {
+        val file = file ?: return
         val options = mutableListOf(
             "Rename/Move",
             "Delete"
         )
+        if (file.isFile) {
+            options.add(0, "Copy Content")
+        }
         AlertDialog.Builder(binding.root.context)
             .setItems(options.toTypedArray()) { _, which ->
                 when (options[which]) {
                     "Rename/Move" -> {
-                        file?.let { file ->
-                            val title = if (file.isFile) "Rename file" else "Rename folder"
-                            val text = when {
-                                file.path.isBlank() -> file.fileName
-                                else -> file.path + "/" + file.fileName
-                            }
-                            showTextDialog(binding.root.context, text= text, title = title) {
-                                if(!viewModel.renameFile(file, it)){
-                                    showErrorDialog(binding.root.context, message = "Failed to rename file")
-                                }
+                        val title = if (file.isFile) "Rename file" else "Rename folder"
+                        val text = when {
+                            file.path.isBlank() -> file.fileName
+                            else -> file.path + "/" + file.fileName
+                        }
+                        showTextDialog(binding.root.context, text = text, title = title) {
+                            if (!viewModel.renameFile(file, it)) {
+                                showErrorDialog(
+                                    binding.root.context,
+                                    message = "Failed to rename file"
+                                )
                             }
                         }
                     }
+
                     "Delete" -> {
-                        file?.let { file ->
-                            viewModel.deleteFile(file)
-                        }
+                        viewModel.deleteFile(file)
                     }
+
+                    "Copy Content" -> {
+                        viewModel.loadContentToClipboard(file.fileId)
+                    }
+
                     else -> throw Error("Options got messed up")
                 }
             }
@@ -102,7 +111,7 @@ class FileViewHolder(
         return when {
             sizeInGB >= 1 -> String.format(Locale.US, "%.2f GB", sizeInGB)
             sizeInMB >= 1 -> String.format(Locale.US, "%.2f MB", sizeInMB)
-            sizeInKB >= 1 -> String.format(Locale.US, "%.2f KB", sizeInMB)
+            sizeInKB >= 1 -> String.format(Locale.US, "%.2f KB", sizeInKB)
             else -> "$sizeInBytes bytes"
         }
     }

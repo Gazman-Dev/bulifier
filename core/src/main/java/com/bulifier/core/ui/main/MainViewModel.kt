@@ -1,11 +1,9 @@
 package com.bulifier.core.ui.main
 
 import android.app.Application
+import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
-import androidx.lifecycle.LiveData
-import androidx.lifecycle.MediatorLiveData
-import androidx.lifecycle.MutableLiveData
-import androidx.lifecycle.switchMap
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
@@ -20,7 +18,9 @@ import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.path
 import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
+import com.bulifier.core.ui.utils.copyToClipboard
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -49,25 +49,39 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         db.fetchProjects()
     }.flow.cachedIn(viewModelScope)
 
-    val openedFile: LiveData<FileInfo?> = MutableLiveData()
-    val fileContent = openedFile.switchMap { fileInfo ->
-        if (fileInfo != null) {
-            app.db.fileDao().getContentLiveData(fileInfo.fileId)
-        } else {
-            MutableLiveData(null as String?) as LiveData<String?>
+    private val _openedFile = MutableStateFlow<FileInfo?>(null)
+    val openedFile: StateFlow<FileInfo?> = _openedFile
+
+    private val _fileContent = MutableStateFlow("")
+    val fileContent: StateFlow<String> = _fileContent
+
+    init {
+        // Automatically update file content when opened file changes
+        viewModelScope.launch {
+            _openedFile.collect { fileInfo ->
+                if (fileInfo != null) {
+                    Log.d("MainViewModel", "fileContent ${fileInfo.fileId}")
+                    val content = app.db.fileDao().getContent(fileInfo.fileId)?.content ?: ""
+                    _fileContent.value = content
+                } else {
+                    Log.d("MainViewModel", "no fileContent")
+                    _fileContent.value = ""
+                }
+            }
         }
     }
 
+    private val _fullPath = MutableStateFlow(FullPath(null, ""))
+    val fullPath: StateFlow<FullPath> = _fullPath
 
-    val fullPath = MediatorLiveData<FullPath>().apply {
-        addSource(openedFile) {
-            value = kotlin.run {
-                val value = path.value
-                FullPath(it?.fileName, extractPath(value))
+    init {
+        // Combine flows to update fullPath when either path or openedFile changes
+        viewModelScope.launch {
+            combine(path.flow, _openedFile) { pathValue, fileInfo ->
+                FullPath(fileInfo?.fileName, extractPath(pathValue))
+            }.collect { newFullPath ->
+                _fullPath.value = newFullPath
             }
-        }
-        addSource(path) {
-            value = FullPath(openedFile.value?.fileName, extractPath(it))
         }
     }
 
@@ -77,24 +91,25 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         } else {
             ""
         }
-        return "${projectName.value}$path"
+        return "${projectName.flow.value}$path"
     }
 
-    val pagingDataFlow by lazy {
-        MediatorLiveData<PagingData<File>>().apply {
-            addSource(path) { newPath ->
-                val currentProjectId = projectId.value ?: return@addSource
-                updatePagingData(newPath, currentProjectId)
-            }
+    private val _pagingDataFlow = MutableStateFlow<PagingData<File>>(PagingData.empty())
+    val pagingDataFlow: StateFlow<PagingData<File>> = _pagingDataFlow
 
-            addSource(projectId) { newProjectId ->
-                val currentPath = path.value ?: projectName.value ?: return@addSource
-                updatePagingData(currentPath, newProjectId)
+    init {
+        // Combine projectId and path changes to update paging data
+        viewModelScope.launch {
+            combine(path.flow, projectId.flow) { newPath, newProjectId ->
+                newPath to newProjectId
+            }.collect { (newPath, newProjectId) ->
+                updatePagingData(newPath, newProjectId)
             }
         }
     }
 
     fun openFile(file: File) {
+        Log.d("MainViewModel", "openFile ${file.fileName}")
         viewModelScope.launch {
             val content = db.getContent(file.fileId) ?: FileData(
                 fileId = file.fileId,
@@ -103,17 +118,23 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
                 content = "",
                 type = Content.Type.NONE
             )
-            openedFile as MutableLiveData
-            openedFile.value = FileInfo(
+            _openedFile.value = FileInfo(
                 fileId = content.fileId,
                 fileName = content.fileName
             )
         }
     }
 
+    fun loadContentToClipboard(fileId: Long) = viewModelScope.launch {
+        db.getContent(fileId)?.let {
+            copyToClipboard(app, it.content)
+            Toast.makeText(app, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     fun closeFile() {
-        openedFile as MutableLiveData
-        openedFile.value = null
+        Log.d("MainViewModel", "closeFile")
+        _openedFile.value = null
     }
 
     private fun updatePagingData(currentPath: String, currentProjectId: Long) {
@@ -127,7 +148,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
                     )
                 }
             ).flow.cachedIn(viewModelScope).collect {
-                pagingDataFlow.value = it
+                _pagingDataFlow.value = it
             }
         }
     }
@@ -155,8 +176,8 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun updateCreateFile(fileName: String) {
         viewModelScope.launch {
-            val projectId = projectId.value ?: return@launch
-            val path = path.value ?: projectName.value ?: return@launch
+            val projectId = projectId.flow.value
+            val path = path.flow.value
             db.insertFile(
                 File(
                     fileName = fileName,
@@ -170,8 +191,8 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun createFolder(folderName: String) {
         viewModelScope.launch {
-            val projectId = projectId.value ?: return@launch
-            val path = path.value ?: return@launch
+            val projectId = projectId.flow.value
+            val path = path.flow.value
             val extraPathParts = mutableListOf<String>()
             val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
             folderName.split("[^a-zA-Z0-9]".toRegex()).forEach {
@@ -190,7 +211,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     fun updateFileContent(content: String) {
-        val openedFile = openedFile.value ?: return
+        val openedFile = _openedFile.value ?: return
         viewModelScope.launch {
             db.insertContentAndUpdateFileSize(
                 Content(
@@ -203,7 +224,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun shareFiles() = viewModelScope.launch {
         withContext(Dispatchers.IO) {
-            val projectId = projectId.value ?: return@withContext
+            val projectId = projectId.flow.value
             val files = db.fetchFilesListByProjectId(projectId)
             MultiFileSharingUtil(app).shareFiles(files)
         }

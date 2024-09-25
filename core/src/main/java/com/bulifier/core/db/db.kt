@@ -3,6 +3,7 @@
 package com.bulifier.core.db
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.paging.PagingSource
 import androidx.room.ColumnInfo
@@ -16,6 +17,7 @@ import androidx.room.Room
 import androidx.room.Transaction
 import androidx.room.Update
 import com.bulifier.core.db.Content.Type
+import kotlinx.coroutines.flow.Flow
 
 val Context.db: AppDatabase
     get() = getDatabase(this)
@@ -98,7 +100,13 @@ interface HistoryDao {
     fun getHistoryByStatuses(
         statuses: List<HistoryStatus>,
         projectId: Long
-    ): LiveData<List<HistoryItem>>
+    ): Flow<List<HistoryItem>>
+
+    @Query("update history set status = 'PROCESSING' where prompt_id = :promptId and status in (:statuses)")
+    suspend fun startProcessingHistoryItem(
+        promptId: Long,
+        statuses: List<HistoryStatus>
+    ): Int
 
     @Delete
     suspend fun deleteHistoryItem(history: HistoryItem)
@@ -294,11 +302,20 @@ interface FileDao {
 
     @Transaction
     suspend fun updateFolderName(oldFolderFile: File, fullPath: String) {
-        val newPath = if(fullPath.trim().startsWith("/")){
-            fullPath.substring(1)
-        }else{
-            fullPath.trim()
+        val newPath = fullPath.replace("[^a-zA-Z0-9_]".toRegex(), "/").trim().run {
+            when {
+                startsWith("/") -> {
+                    fullPath.substring(1)
+                }
+
+                endsWith("/") -> {
+                    fullPath.substring(0, fullPath.length - 1)
+                }
+
+                else -> this
+            }
         }
+
         val oldFolderPath = if (oldFolderFile.path.isNotBlank()) {
             oldFolderFile.path + "/" + oldFolderFile.fileName
         } else {
@@ -308,16 +325,26 @@ interface FileDao {
         val newFileName = newPath.substringAfterLast('/')
         val newFolderPath = newPath.substringBeforeLast('/')
 
+        Log.d(
+            "updateFolderName",
+            """
+                id: ${oldFolderFile.fileId} 
+                old Path: $oldFolderPath 
+                new Path: $newFolderPath 
+                new Name: $newFileName"""
+                .trimIndent()
+        )
+
         val updatedFile = oldFolderFile.copy(fileName = newFileName, path = newFolderPath)
         val oldFolderPathLength = oldFolderPath.length
 
-        updateFile(updatedFile)
         updateChildPathsByIndex(
             oldFolderPath,
             newPath,
             oldFolderPathLength,
             oldFolderFile.projectId
         )
+        updateFile(updatedFile)
         addParentFolders(newFolderPath, oldFolderFile.projectId)
     }
 
@@ -340,7 +367,8 @@ interface FileDao {
         }
     }
 
-    @Query("""
+    @Query(
+        """
     INSERT OR REPLACE INTO files
     SELECT 
         file_id,
@@ -356,7 +384,8 @@ interface FileDao {
     FROM files
     WHERE path LIKE :oldFolderPath || '%' 
     AND project_id = :projectId
-""")
+"""
+    )
     suspend fun updateChildPathsByIndex(
         oldFolderPath: String,
         newFolderPath: String,

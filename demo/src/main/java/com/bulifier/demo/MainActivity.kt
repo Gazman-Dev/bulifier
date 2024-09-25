@@ -17,7 +17,7 @@ class MainActivity : AppCompatActivity() {
         val navGraph =
             navController.navInflater.inflate(com.bulifier.core.R.navigation.core_nav_graph)
 
-        if (Prefs.projectName.value != null) {
+        if (Prefs.projectName.flow.value.isNotBlank()) {
             navGraph.setStartDestination(com.bulifier.core.R.id.mainFragment)
         } else {
             navGraph.setStartDestination(com.bulifier.core.R.id.projectsFragment)
