@@ -2,6 +2,7 @@ package com.bulifier.core.ui.main
 
 import android.app.Application
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -17,6 +18,7 @@ import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.path
 import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
+import com.bulifier.core.ui.utils.copyToClipboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -120,6 +122,13 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
                 fileId = content.fileId,
                 fileName = content.fileName
             )
+        }
+    }
+
+    fun loadContentToClipboard(fileId: Long) = viewModelScope.launch {
+        db.getContent(fileId)?.let {
+            copyToClipboard(app, it.content)
+            Toast.makeText(app, "Copied to clipboard", Toast.LENGTH_SHORT).show()
         }
     }
 

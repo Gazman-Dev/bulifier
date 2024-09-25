@@ -1,7 +1,10 @@
 package com.bulifier.core.ui.utils
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 
 fun showTextDialog(
@@ -44,4 +47,10 @@ fun showErrorDialog(context: Context, message: String, title: String? = "Error")
     }
 
     builder.show()
+}
+
+fun copyToClipboard(context: Context, text: String) {
+    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+    val clip = ClipData.newPlainText("label", text)
+    clipboard.setPrimaryClip(clip)
 }

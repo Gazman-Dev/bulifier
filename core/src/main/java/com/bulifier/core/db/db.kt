@@ -102,6 +102,12 @@ interface HistoryDao {
         projectId: Long
     ): Flow<List<HistoryItem>>
 
+    @Query("update history set status = 'PROCESSING' where prompt_id = :promptId and status in (:statuses)")
+    suspend fun startProcessingHistoryItem(
+        promptId: Long,
+        statuses: List<HistoryStatus>
+    ): Int
+
     @Delete
     suspend fun deleteHistoryItem(history: HistoryItem)
 

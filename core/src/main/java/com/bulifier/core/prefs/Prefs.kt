@@ -45,7 +45,12 @@ class PrefListValue(
     private val key: String
 ) {
     // Default to an empty list if no value is found
-    private val _valueFlow = MutableStateFlow(pref.getString(key, "")?.split("\t") ?: emptyList())
+    private val _valueFlow =
+        MutableStateFlow(pref.getString(key, "")
+            ?.split("\t")
+            ?.filter { it.isNotEmpty() }
+            ?: emptyList()
+        )
 
     val flow: StateFlow<List<String>> = _valueFlow
 

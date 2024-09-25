@@ -1,5 +1,6 @@
 package com.bulifier.core.api
 
+import android.util.Log
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.db.Content
@@ -29,35 +30,6 @@ class AiService : LifecycleService() {
     override fun onCreate() {
         super.onCreate()
 
-        // Flow collector for observing changes
-        val collector: suspend (List<HistoryItem>) -> Unit = { historyItems ->
-            historyItems.forEach { historyItem ->
-                if (historyItem.modelId == null) {
-                    lifecycleScope.launch {
-                        db.historyDao()
-                            .markError(historyItem.promptId, "No model selected")
-                    }
-                    return@forEach
-                }
-                lifecycleScope.launch {
-                    val filesContext = if (historyItem.contextFiles.isNotEmpty()) {
-                        db.fileDao().getContent(historyItem.contextFiles)
-                    } else {
-                        emptyList()
-                    }
-                    val responses = db.historyDao().getResponses(historyItem.promptId)
-                    try {
-                        process(historyItem, filesContext, responses)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
-                        db.historyDao()
-                            .markError(historyItem.promptId, e.message ?: "Unknown error")
-                    }
-                }
-            }
-        }
-
-        // Collect the projectId Flow and handle the data
         lifecycleScope.launch {
             Prefs.projectId.flow.collect { projectId ->
                 db.historyDao().getHistoryByStatuses(
@@ -66,7 +38,45 @@ class AiService : LifecycleService() {
                         HistoryStatus.RE_APPLYING
                     ),
                     projectId = projectId
-                ).collect(collector) // Collecting the flow of history items
+                ).collect { jobs ->
+                    jobs.forEach {
+                        process(it)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun process(historyItem: HistoryItem) {
+        if (historyItem.modelId == null) {
+            db.historyDao()
+                .markError(historyItem.promptId, "No model selected")
+            return
+        }
+
+        if (db.historyDao().startProcessingHistoryItem(
+            historyItem.promptId, statuses = listOf(
+                HistoryStatus.SUBMITTED,
+                HistoryStatus.RE_APPLYING
+            )
+        ) == 0){
+            Log.d("AiService", "Already processing or not found. Id: ${historyItem.promptId}")
+            return
+        }
+
+        lifecycleScope.launch {
+            val filesContext = if (historyItem.contextFiles.isNotEmpty()) {
+                db.fileDao().getContent(historyItem.contextFiles)
+            } else {
+                emptyList()
+            }
+            val responses = db.historyDao().getResponses(historyItem.promptId)
+            try {
+                process(historyItem, filesContext, responses)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                db.historyDao()
+                    .markError(historyItem.promptId, e.message ?: "Unknown error")
             }
         }
     }
