@@ -5,9 +5,11 @@ import androidx.annotation.VisibleForTesting
 import com.bulifier.core.BuildConfig
 import com.bulifier.core.db.AppDatabase
 import com.bulifier.core.db.Schema
+import com.bulifier.core.db.SchemaSettings
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
 import com.bulifier.core.utils.appVersionCode
+import io.ktor.util.toLowerCasePreservingASCIIRules
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -17,14 +19,12 @@ import kotlinx.coroutines.withContext
 object SchemaModel {
     const val KEY_PACKAGE = "package"
     const val KEY_CONTEXT = "context"
-    const val KEY_FILE_NAME = "fileName"
     const val KEY_PROMPT = "prompt"
     const val KEY_BULLET_FILE = "bullet_file"
 
-    val keys = setOf(
+    private val keys = setOf(
         KEY_PACKAGE,
         KEY_CONTEXT,
-        KEY_FILE_NAME,
         KEY_PROMPT,
         KEY_BULLET_FILE
     )
@@ -63,7 +63,20 @@ object SchemaModel {
                     )
                 }
             }?.run {
-                context.db.schemaDao().addSchemas(flatten())
+                val schemas = flatten()
+                val settings = schemas.filter { it.type == SchemaType.SETTINGS }.map {
+                    val map = it.content.split("\n").associate { line ->
+                        val values = line.substring(" - ".length).lowercase().split(":")
+                        values[0] to values[1]
+                    }
+                    SchemaSettings(
+                        schemaName = it.schemaName,
+                        fileExtension = map["file extension"] ?: "bul",
+                        runForEachFile = map["run for each file"] == "true",
+                        multiFilesOutput = map["multi files output"] == "true"
+                    )
+                }
+                context.db.schemaDao().addSchemas(schemas, settings)
             }
         }
     }

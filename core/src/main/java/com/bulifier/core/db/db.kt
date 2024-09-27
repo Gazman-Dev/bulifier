@@ -53,19 +53,29 @@ interface SchemaDao {
     @Insert
     suspend fun addSchema(schema: Schema)
 
+    @Insert
+    suspend fun _addSchemas(schema: List<Schema>)
+
+    @Insert
+    suspend fun _addSettings(schema: List<SchemaSettings>)
+
     @Query("DELETE FROM schemas")
     suspend fun deleteAllSchemas()
 
     @Transaction
-    suspend fun addSchemas(schemas: List<Schema>) {
+    suspend fun addSchemas(schemas: List<Schema>, settings: List<SchemaSettings>) {
         deleteAllSchemas()
-        schemas.forEach {
-            addSchema(it)
-        }
+        _addSchemas(schemas)
+        _addSettings(settings)
     }
 
     @Query("SELECT * FROM schemas where schema_name = :schemaName order by schema_id")
-    suspend fun getSchema(schemaName: String): Array<Schema>
+    suspend fun getSchema(schemaName: String): List<Schema>
+
+    @Query("SELECT * FROM schema_settings where schema_name = :schemaName")
+    suspend fun getSettings(schemaName: String): SchemaSettings
+
+    data class SchemaData(val schemas:List<Schema>, val settings:SchemaSettings)
 
     @Query("SELECT distinct schema_name FROM schemas order by schema_name")
     suspend fun getSchemaNames(): Array<String>

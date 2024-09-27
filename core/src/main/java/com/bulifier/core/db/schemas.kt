@@ -21,7 +21,8 @@ import java.util.Date
         Content::class,
         HistoryItem::class,
         Schema::class,
-        ResponseItem::class
+        ResponseItem::class,
+        SchemaSettings::class
     ], version = 1
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -112,10 +113,31 @@ data class Schema(
     val keys: LinkedHashSet<String>
 )
 
+@Entity(tableName = "schema_settings", indices = [Index(value = ["schema_name"], unique = true)])
+data class SchemaSettings(
+
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "schema_name")
+    val schemaName: String,
+
+    @ColumnInfo(name = "file_extension")
+    val fileExtension: String = "bul",
+
+    @ColumnInfo(name = "run_for_each_file")
+    val runForEachFile: Boolean = false,
+
+    @ColumnInfo(name = "multi_files_output")
+    val multiFilesOutput: Boolean = false,
+)
+
 enum class SchemaType {
     SYSTEM,
     USER,
     COMMENT,
+    SETTINGS,
     CONTEXT;
 
     companion object {
@@ -124,6 +146,7 @@ enum class SchemaType {
             "system-loop" -> CONTEXT
             "user" -> USER
             "comment" -> COMMENT
+            "settings" -> SETTINGS
             else -> throw IllegalArgumentException("Invalid schema type: $value")
         }
     }
