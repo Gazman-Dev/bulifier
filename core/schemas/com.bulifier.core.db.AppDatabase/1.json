@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "52aa9464eedc23f1d2e9d5f023cd3d1d",
+    "identityHash": "d6bee3d9d926d70e2cb02a99238dc4eb",
     "entities": [
       {
         "tableName": "projects",
@@ -399,12 +399,66 @@
             ]
           }
         ]
+      },
+      {
+        "tableName": "schema_settings",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `schema_name` TEXT NOT NULL, `file_extension` TEXT NOT NULL, `run_for_each_file` INTEGER NOT NULL, `multi_files_output` INTEGER NOT NULL)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "schemaName",
+            "columnName": "schema_name",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "fileExtension",
+            "columnName": "file_extension",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "runForEachFile",
+            "columnName": "run_for_each_file",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "multiFilesOutput",
+            "columnName": "multi_files_output",
+            "affinity": "INTEGER",
+            "notNull": true
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_schema_settings_schema_name",
+            "unique": true,
+            "columnNames": [
+              "schema_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_schema_settings_schema_name` ON `${TABLE_NAME}` (`schema_name`)"
+          }
+        ],
+        "foreignKeys": []
       }
     ],
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '52aa9464eedc23f1d2e9d5f023cd3d1d')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd6bee3d9d926d70e2cb02a99238dc4eb')"
     ]
   }
 }

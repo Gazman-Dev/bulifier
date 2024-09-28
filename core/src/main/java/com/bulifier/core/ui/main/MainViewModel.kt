@@ -56,13 +56,14 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     val fileContent: StateFlow<String> = _fileContent
 
     init {
-        // Automatically update file content when opened file changes
         viewModelScope.launch {
-            _openedFile.collect { fileInfo ->
+            _openedFile.collectLatest { fileInfo ->
                 if (fileInfo != null) {
-                    Log.d("MainViewModel", "fileContent ${fileInfo.fileId}")
-                    val content = app.db.fileDao().getContent(fileInfo.fileId)?.content ?: ""
-                    _fileContent.value = content
+                    Log.d("MainViewModel", "open file ${fileInfo.fileId}")
+                    app.db.fileDao().getContentFlow(fileInfo.fileId).collect{
+                        Log.d("MainViewModel", "file content changed ${fileInfo.fileId}")
+                        _fileContent.value = it?.content ?: ""
+                    }
                 } else {
                     Log.d("MainViewModel", "no fileContent")
                     _fileContent.value = ""

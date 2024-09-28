@@ -62,9 +62,13 @@ interface SchemaDao {
     @Query("DELETE FROM schemas")
     suspend fun deleteAllSchemas()
 
+    @Query("DELETE FROM schema_settings")
+    suspend fun deleteAllSchemasSettings()
+
     @Transaction
     suspend fun addSchemas(schemas: List<Schema>, settings: List<SchemaSettings>) {
         deleteAllSchemas()
+        deleteAllSchemasSettings()
         _addSchemas(schemas)
         _addSettings(settings)
     }
@@ -153,7 +157,7 @@ interface FileDao {
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
 
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
-    fun fetchFilesListByPathAndProjectId(path: String, projectId: Long): List<File>
+    suspend fun fetchFilesListByPathAndProjectId(path: String, projectId: Long): List<File>
 
     @Query("SELECT contents.* FROM files join contents on files.file_id = contents.file_id WHERE project_id = :projectId and contents.type = :type")
     fun fetchFilesListByProjectIdAndType(
@@ -183,6 +187,9 @@ interface FileDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertContent(content: Content): Long
 
+    @Update()
+    suspend fun updateContent(content: Content): Int
+
     @Query("UPDATE files SET size = :size WHERE file_id = :fileId")
     suspend fun updateFileSize(fileId: Long, size: Int)
 
@@ -190,6 +197,13 @@ interface FileDao {
     suspend fun insertContentAndUpdateFileSize(content: Content) {
         insertContent(content)
         updateFileSize(content.fileId, content.content.length)
+    }
+
+    @Transaction
+    suspend fun updateContentAndFileSize(content: Content): Int {
+        val count = updateContent(content)
+        updateFileSize(content.fileId, content.content.length)
+        return count
     }
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -229,6 +243,18 @@ interface FileDao {
         """
     )
     suspend fun getContent(fileId: Long): FileData?
+
+    @Query(
+        """SELECT 
+            files.file_name, 
+            files.path, 
+            contents.* 
+        FROM contents 
+            join files on contents.file_id = files.file_id
+        WHERE contents.file_id = :fileId
+        """
+    )
+    fun getContentFlow(fileId: Long): Flow<FileData?>
 
     @Query(
         """SELECT 

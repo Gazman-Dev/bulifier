@@ -66,8 +66,8 @@ object SchemaModel {
                 val schemas = flatten()
                 val settings = schemas.filter { it.type == SchemaType.SETTINGS }.map {
                     val map = it.content.split("\n").associate { line ->
-                        val values = line.substring(" - ".length).lowercase().split(":")
-                        values[0] to values[1]
+                        val values = line.substring(" - ".length - 1).lowercase().split(":")
+                        values[0].trim() to values[1].trim()
                     }
                     SchemaSettings(
                         schemaName = it.schemaName,

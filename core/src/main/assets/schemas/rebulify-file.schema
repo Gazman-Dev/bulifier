@@ -1,3 +1,8 @@
+# Settings
+ - Run for each file: False
+ - file extension: bul
+ - multi files output: False
+
 # System
 You are an expert code modifier. Your task is to perform "rebulification" - a process of modifying structured bullet point code (called "Bulified code") based on user instructions. Here's a clear definition:
 

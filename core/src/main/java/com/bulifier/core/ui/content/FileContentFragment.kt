@@ -26,6 +26,7 @@ class FileContentFragment : Fragment() {
     private lateinit var binding: CoreFileContentFragmentBinding
     private val viewModel by activityViewModels<MainViewModel>()
     private var dirty = false
+    private var systemText = ""
     private val historyViewModel by activityViewModels<HistoryViewModel>()
 
     override fun onCreateView(
@@ -51,11 +52,12 @@ class FileContentFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.fileContent.collect {
                 if (text != it) {
-                    Log.d("FileContentFragment", "Text is different ${it.length}")
+                    Log.d("FileContentFragment", "UI: Text is different ${it.length}")
+                    systemText = it
                     binding.textBox.setText(it)
                     binding.textBoxView.text = it
                 } else {
-                    Log.d("FileContentFragment", "Text is the same ${it.length}")
+                    Log.d("FileContentFragment", "UI: Text is the same ${it.length}")
                 }
             }
         }
@@ -72,10 +74,13 @@ class FileContentFragment : Fragment() {
 
             override fun afterTextChanged(s: android.text.Editable?) {
                 val newText = s.toString()
+                if(newText == systemText){
+                    return
+                }
                 dirty = text != newText
                 text = newText
 
-                Log.d("FileContentFragment", "Text updated ${newText.length}")
+                Log.d("FileContentFragment", "UI: Text updated ${newText.length}")
             }
         })
 
@@ -90,11 +95,21 @@ class FileContentFragment : Fragment() {
         Ticker(viewLifecycleOwner) {
             if (dirty) {
                 viewModel.updateFileContent(binding.textBox.text.toString())
-                Log.d("FileContentFragment", "viewModel updated")
+                Log.d("FileContentFragment", "UI: viewModel updated")
             }
             dirty = false
         }
 
+    }
+
+    override fun onPause() {
+        dirty = false
+        super.onPause()
+    }
+
+    override fun onStop() {
+        dirty = false
+        super.onStop()
     }
 
     @SuppressLint("ClickableViewAccessibility")
