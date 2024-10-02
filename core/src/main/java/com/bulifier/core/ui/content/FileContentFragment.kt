@@ -26,6 +26,7 @@ class FileContentFragment : Fragment() {
     private lateinit var binding: CoreFileContentFragmentBinding
     private val viewModel by activityViewModels<MainViewModel>()
     private var dirty = false
+    private var systemText = ""
     private val historyViewModel by activityViewModels<HistoryViewModel>()
 
     override fun onCreateView(
@@ -39,6 +40,9 @@ class FileContentFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        val ticker = Ticker(viewLifecycleOwner) {
+            updateContent()
+        }
         binding.ai.setOnClickListener {
             viewModel.fullPath.value.run {
                 historyViewModel.createNewAiJob(path, fileName)
@@ -50,13 +54,12 @@ class FileContentFragment : Fragment() {
         binding.textBoxView.movementMethod = ScrollingMovementMethod()
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.fileContent.collect {
-                if (text != it) {
-                    Log.d("FileContentFragment", "Text is different ${it.length}")
-                    binding.textBox.setText(it)
-                    binding.textBoxView.text = it
-                } else {
-                    Log.d("FileContentFragment", "Text is the same ${it.length}")
-                }
+                Log.d("FileContentFragment", "UI: updated from model\n\n$it\n\n")
+                systemText = it
+                dirty = false
+                ticker.reset()
+                binding.textBox.setText(it)
+                binding.textBoxView.text = it
             }
         }
 
@@ -72,10 +75,14 @@ class FileContentFragment : Fragment() {
 
             override fun afterTextChanged(s: android.text.Editable?) {
                 val newText = s.toString()
+                if(newText == systemText){
+                    return
+                }
                 dirty = text != newText
                 text = newText
+                binding.textBoxView.text = newText
 
-                Log.d("FileContentFragment", "Text updated ${newText.length}")
+                Log.d("FileContentFragment", "UI: Text updated ${newText.length}")
             }
         })
 
@@ -87,14 +94,21 @@ class FileContentFragment : Fragment() {
 
         setupDoubleTop()
 
-        Ticker(viewLifecycleOwner) {
-            if (dirty) {
-                viewModel.updateFileContent(binding.textBox.text.toString())
-                Log.d("FileContentFragment", "viewModel updated")
-            }
-            dirty = false
-        }
 
+    }
+
+    private fun updateContent() {
+        if (dirty) {
+            dirty = false
+            val content = binding.textBox.text.toString()
+            viewModel.updateFileContent(content)
+            Log.d("FileContentFragment", "UI: viewModel updated\n\n$content\n\n")
+        }
+    }
+
+    override fun onPause() {
+        updateContent()
+        super.onPause()
     }
 
     @SuppressLint("ClickableViewAccessibility")

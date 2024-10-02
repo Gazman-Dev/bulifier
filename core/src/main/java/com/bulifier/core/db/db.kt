@@ -53,19 +53,33 @@ interface SchemaDao {
     @Insert
     suspend fun addSchema(schema: Schema)
 
+    @Insert
+    suspend fun _addSchemas(schema: List<Schema>)
+
+    @Insert
+    suspend fun _addSettings(schema: List<SchemaSettings>)
+
     @Query("DELETE FROM schemas")
     suspend fun deleteAllSchemas()
 
+    @Query("DELETE FROM schema_settings")
+    suspend fun deleteAllSchemasSettings()
+
     @Transaction
-    suspend fun addSchemas(schemas: List<Schema>) {
+    suspend fun addSchemas(schemas: List<Schema>, settings: List<SchemaSettings>) {
         deleteAllSchemas()
-        schemas.forEach {
-            addSchema(it)
-        }
+        deleteAllSchemasSettings()
+        _addSchemas(schemas)
+        _addSettings(settings)
     }
 
     @Query("SELECT * FROM schemas where schema_name = :schemaName order by schema_id")
-    suspend fun getSchema(schemaName: String): Array<Schema>
+    suspend fun getSchema(schemaName: String): List<Schema>
+
+    @Query("SELECT * FROM schema_settings where schema_name = :schemaName")
+    suspend fun getSettings(schemaName: String): SchemaSettings
+
+    data class SchemaData(val schemas:List<Schema>, val settings:SchemaSettings)
 
     @Query("SELECT distinct schema_name FROM schemas order by schema_name")
     suspend fun getSchemaNames(): Array<String>
@@ -143,13 +157,27 @@ interface FileDao {
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
 
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
-    fun fetchFilesListByPathAndProjectId(path: String, projectId: Long): List<File>
+    suspend fun fetchFilesListByPathAndProjectId(path: String, projectId: Long): List<File>
 
     @Query("SELECT contents.* FROM files join contents on files.file_id = contents.file_id WHERE project_id = :projectId and contents.type = :type")
     fun fetchFilesListByProjectIdAndType(
         projectId: Long,
         type: String = Type.RAW.toString()
     ): List<Content>
+
+    @Query(
+        """SELECT 
+            files.file_name, 
+            files.path, 
+            contents.* 
+        FROM contents 
+            join files on contents.file_id = files.file_id
+        WHERE files.path = :path and project_id = :projectId"""
+    )
+    fun loadFilesByPath(
+        path: String,
+        projectId: Long
+    ): List<FileData>
 
     @Query(
         """SELECT 
@@ -170,16 +198,34 @@ interface FileDao {
     @Query("SELECT * FROM files WHERE file_name LIKE :name")
     fun searchFilesByName(name: String): PagingSource<Int, File>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertContent(content: Content): Long
+
+    @Transaction
+    suspend fun upsertContent(content: Content) {
+        val id = insertContent(content)
+        if (id == -1L) {
+            updateContent(content)
+        }
+    }
+
+    @Update()
+    suspend fun updateContent(content: Content): Int
 
     @Query("UPDATE files SET size = :size WHERE file_id = :fileId")
     suspend fun updateFileSize(fileId: Long, size: Int)
 
     @Transaction
     suspend fun insertContentAndUpdateFileSize(content: Content) {
-        insertContent(content)
+        upsertContent(content)
         updateFileSize(content.fileId, content.content.length)
+    }
+
+    @Transaction
+    suspend fun updateContentAndFileSize(content: Content): Int {
+        val count = updateContent(content)
+        updateFileSize(content.fileId, content.content.length)
+        return count
     }
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
@@ -222,6 +268,18 @@ interface FileDao {
 
     @Query(
         """SELECT 
+            files.file_name, 
+            files.path, 
+            contents.* 
+        FROM contents 
+            join files on contents.file_id = files.file_id
+        WHERE contents.file_id = :fileId
+        """
+    )
+    fun getContentFlow(fileId: Long): Flow<FileData?>
+
+    @Query(
+        """SELECT 
             content
         FROM contents 
         WHERE contents.file_id = :fileId
@@ -240,6 +298,15 @@ interface FileDao {
         """
     )
     suspend fun getContent(path: String, fileName: String, projectId: Long): FileData?
+
+    @Query(
+        """SELECT 
+            files.path || '/' || files.file_name 
+        FROM files
+        WHERE (files.path || '/' || files.file_name) in (:fullFileName) and files.project_id = :projectId
+        """
+    )
+    suspend fun getFilesInList(fullFileName:List<String>, projectId: Long): List<String>
 
     @Query(
         """SELECT
@@ -392,6 +459,9 @@ interface FileDao {
         oldFolderPathLength: Int,
         projectId: Long
     )
+
+    @Query("SELECT count(*) > 0 FROM files WHERE path = :path AND project_id = :projectId")
+    suspend fun isPathExists(path:String, projectId:Long) : Boolean
 }
 
 data class FileData(

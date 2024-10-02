@@ -22,10 +22,14 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreMainFragmentBinding
+import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 data class TitleAction(val title: String, val action: () -> Unit)
@@ -88,6 +92,28 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
         binding.recyclerView.adapter = filesAdapter
+
+        binding.reloadSchemasButton.setOnClickListener {
+            viewModel.reloadSchemas()
+        }
+
+        binding.resetSchemasButton.setOnClickListener {
+            viewModel.resetSystemSchemas()
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            Prefs.path.flow.combine(viewModel.openedFile){ path, openFile ->
+                if(openFile != null){
+                    null
+                }
+                else{
+                    path
+                }
+            }.collectLatest {
+                binding.reloadSchemasButton.isVisible = it == "schemas"
+                binding.resetSchemasButton.isVisible = it == "schemas"
+            }
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             launch {

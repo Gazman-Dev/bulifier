@@ -7,7 +7,7 @@ import androidx.lifecycle.LifecycleOwner
 
 class Ticker(
     private val lifecycleOwner: LifecycleOwner,
-    private val intervalMillis: Long = 1000L,
+    private val intervalMillis: Long = 5000L,
     private val onTick: () -> Unit
 ) : DefaultLifecycleObserver {
 
@@ -24,7 +24,12 @@ class Ticker(
     }
 
     override fun onResume(owner: LifecycleOwner) {
-        handler.post(tickerRunnable)
+        handler.postDelayed(tickerRunnable, intervalMillis)
+    }
+
+    fun reset(){
+        handler.removeCallbacks(tickerRunnable)
+        handler.postDelayed(tickerRunnable, intervalMillis)
     }
 
     override fun onPause(owner: LifecycleOwner) {

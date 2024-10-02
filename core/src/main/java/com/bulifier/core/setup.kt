@@ -6,12 +6,14 @@ import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import com.bulifier.core.api.AiService
+import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.schemas.SchemaModel
 
 class Setup : ContentProvider() {
 
     override fun onCreate(): Boolean {
         context!!.apply {
+            Prefs.initialize(applicationContext)
             SchemaModel.init(applicationContext)
             startService(Intent(this, AiService::class.java))
         }
