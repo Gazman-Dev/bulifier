@@ -131,6 +131,9 @@ data class SchemaSettings(
 
     @ColumnInfo(name = "multi_files_output")
     val multiFilesOutput: Boolean = false,
+
+    @ColumnInfo(name = "override_files")
+    val overrideFiles: Boolean = false,
 )
 
 enum class SchemaType {
@@ -260,6 +263,7 @@ data class HistoryItem(
 
     companion object{
         const val SCHEMA_BULLIFY = "bulify"
+        const val UPDATE_SCHEMA = "update-schema"
         const val SCHEMA_DEBULIFY = "debulify"
         const val SCHEMA_REBULIFY_FILE = "rebulify-file"
     }

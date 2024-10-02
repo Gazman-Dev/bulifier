@@ -15,17 +15,14 @@ import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
 import com.bulifier.core.models.QuestionsModel
 import com.bulifier.core.prefs.Prefs
-import com.bulifier.core.schemas.SchemaModel.KEY_BULLET_FILE
+import com.bulifier.core.schemas.SchemaModel
+import com.bulifier.core.schemas.SchemaModel.KEY_MAIN_FILE
 import com.bulifier.core.schemas.SchemaModel.KEY_CONTEXT
 import com.bulifier.core.schemas.SchemaModel.KEY_PACKAGE
 import com.bulifier.core.schemas.SchemaModel.KEY_PROMPT
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
-import kotlinx.coroutines.flow.launchIn
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -109,7 +106,7 @@ class AiService : LifecycleService() {
         Log.d("AiService", "Model: $model")
 
         val fileData =
-            if (keys.contains(KEY_BULLET_FILE) && historyItem.fileName?.isNotBlank() == true) {
+            if (keys.contains(KEY_MAIN_FILE) && historyItem.fileName?.isNotBlank() == true) {
                 db.fileDao()
                     .getContent(historyItem.path, historyItem.fileName, historyItem.projectId)
             } else null
@@ -117,7 +114,7 @@ class AiService : LifecycleService() {
         Log.d("AiService", "File data: $fileData")
 
         if (settings.runForEachFile) {
-            handleDebulify(historyItem, model, settings)
+            processMultipleFiles(historyItem, model, settings)
         } else {
             processSingleCall(
                 responses,
@@ -165,33 +162,51 @@ class AiService : LifecycleService() {
             if (settings.multiFilesOutput) {
                 applyMultiFileOutput(data)
             } else {
-                fileData?.let {
-                    Log.d("AiService", "insertContentAndUpdateFileSize ${it.fileId}")
-                    val content = it.toContent().copy(content = data.response)
-                    val count = db.fileDao().updateContentAndFileSize(content)
-                    Log.d("AiService", "Count: $count File content: ${content.content}")
-                }
+                overrideFile(fileData, data)
             }
         }
     }
 
-    private suspend fun handleDebulify(
+    private suspend fun overrideFile(
+        fileData: FileData?,
+        data: ResponseData
+    ) {
+        fileData?.let {
+            Log.d("AiService", "insertContentAndUpdateFileSize ${it.fileId}")
+            val normalizeContent = normalizeContent(data.response)
+            val content = it.toContent().copy(content = normalizeContent)
+            val count = db.fileDao().updateContentAndFileSize(content)
+            Log.d("AiService", "Count: $count File content: $normalizeContent")
+        }
+    }
+
+    private suspend fun processMultipleFiles(
         historyItem: HistoryItem,
         model: QuestionsModel,
         settings: SchemaSettings
     ) =
         db.fileDao().fetchFilesListByPathAndProjectId(historyItem.path, historyItem.projectId)
             .forEach { file ->
+                if(file.fileName == "update-schema.schema" && file.path == "schemas"){
+                    // don't mess up with the master schema
+                    return
+                }
+                val fileData = db.fileDao().getContent(file.fileId)
                 val schemas: List<Schema> = prepareSchema(
                     userPrompt = historyItem.prompt,
                     packageName = historyItem.path,
-                    fileData = db.fileDao().getContent(file.fileId),
+                    fileData = fileData,
                     schemas = getSchemas(historyItem.schema)
                 )
 
                 val messages = toMessages(schemas)
                 sendMessages(model, messages, historyItem)?.let { responseData ->
-                    applyDebulifyResponse(responseData, file, settings)
+                    if(settings.overrideFiles){
+                        overrideFile(fileData, responseData)
+                    }
+                    else {
+                        insertFile(responseData, file, settings)
+                    }
                 }
             }
 
@@ -237,7 +252,7 @@ class AiService : LifecycleService() {
         return ResponseData(historyItem, response)
     }
 
-    private suspend fun applyDebulifyResponse(
+    private suspend fun insertFile(
         responseData: ResponseData,
         file: File,
         settings: SchemaSettings
@@ -252,7 +267,18 @@ class AiService : LifecycleService() {
                 isFile = true,
                 path = file.path
             )
-        )
+        ).run {
+            if(this == -1L){
+                db.fileDao().getFileId(
+                    path = "schemas",
+                    fileName = fileName,
+                    projectId = projectId
+                ) ?: return
+            }
+            else{
+                this
+            }
+        }
         db.fileDao().insertContentAndUpdateFileSize(
             Content(
                 fileId = fileId,
@@ -306,6 +332,21 @@ class AiService : LifecycleService() {
             )
         }
     }
+
+    private fun normalizeContent(input: String): String {
+        // Trim the input first
+        var normalized = input.trim()
+
+        // Remove code block markers with or without a language specification
+        val codeBlockRegex = Regex("```(\\w+)?\\s*([\\s\\S]*?)\\s*```")
+        normalized = codeBlockRegex.replace(normalized) { matchResult ->
+            // The match result contains only the content within the code block
+            matchResult.groups[2]?.value?.trim() ?: ""
+        }
+
+        return normalized
+    }
+
 
     private fun toMessages(schemas: List<Schema>): List<MessageData> {
         return schemas.map {
@@ -370,8 +411,8 @@ class AiService : LifecycleService() {
         if (keys.contains(KEY_PROMPT)) {
             result = result.replace("{$KEY_PROMPT}", userPrompt)
         }
-        if (keys.contains(KEY_BULLET_FILE)) {
-            result = result.replace("{$KEY_BULLET_FILE}", fileData?.content ?: "")
+        if (keys.contains(KEY_MAIN_FILE)) {
+            result = result.replace("{$KEY_MAIN_FILE}", fileData?.content ?: "")
         }
         return result
     }

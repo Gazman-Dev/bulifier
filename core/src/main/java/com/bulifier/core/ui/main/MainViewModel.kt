@@ -18,6 +18,7 @@ import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.path
 import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
+import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.utils.copyToClipboard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
@@ -266,6 +267,18 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
             else{
                 db.deleteFolder(file.fileId, file.path + "/" + file.fileName)
             }
+        }
+    }
+
+    fun reloadSchemas() {
+        viewModelScope.launch {
+            SchemaModel.reloadSchemas(projectId.flow.value)
+        }
+    }
+
+    fun resetSystemSchemas() {
+        viewModelScope.launch {
+            SchemaModel.resetSystemSchemas(projectId.flow.value)
         }
     }
 }

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "d6bee3d9d926d70e2cb02a99238dc4eb",
+    "identityHash": "1620885fd6d9e267bdab886c78e5e521",
     "entities": [
       {
         "tableName": "projects",
@@ -402,7 +402,7 @@
       },
       {
         "tableName": "schema_settings",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `schema_name` TEXT NOT NULL, `file_extension` TEXT NOT NULL, `run_for_each_file` INTEGER NOT NULL, `multi_files_output` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `schema_name` TEXT NOT NULL, `file_extension` TEXT NOT NULL, `run_for_each_file` INTEGER NOT NULL, `multi_files_output` INTEGER NOT NULL, `override_files` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -433,6 +433,12 @@
             "columnName": "multi_files_output",
             "affinity": "INTEGER",
             "notNull": true
+          },
+          {
+            "fieldPath": "overrideFiles",
+            "columnName": "override_files",
+            "affinity": "INTEGER",
+            "notNull": true
           }
         ],
         "primaryKey": {
@@ -458,7 +464,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd6bee3d9d926d70e2cb02a99238dc4eb')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '1620885fd6d9e267bdab886c78e5e521')"
     ]
   }
 }

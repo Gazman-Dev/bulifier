@@ -51,7 +51,7 @@ Generate the rebulified code as a complete, standalone Bulified code file incorp
 # User
 Please rebulify the following file:
 
-{bullet_file}
+{main_file}
 
 Using these instructions:
 

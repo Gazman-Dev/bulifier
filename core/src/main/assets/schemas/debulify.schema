@@ -47,3 +47,7 @@ Generate the debulified code as a single, compilable file in the target programm
 
 # User
 {prompt}
+
+File to translate:
+
+{main_file}

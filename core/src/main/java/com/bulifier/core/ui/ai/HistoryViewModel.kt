@@ -119,6 +119,7 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             val schema = when {
                 fileName != null -> HistoryItem.SCHEMA_REBULIFY_FILE
+                path == "schemas" -> HistoryItem.UPDATE_SCHEMA
                 filesDb.isPathEmpty(path, projectId.flow.value) -> HistoryItem.SCHEMA_BULLIFY
                 else -> HistoryItem.SCHEMA_DEBULIFY
             }
@@ -161,7 +162,7 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
 
     private fun dropProjectName(p: String) = p.replace("${Prefs.projectName.flow.value}/", "")
 
-    fun send(prompt: String) {
+    fun send(prompt: String, schema: String) {
         Log.d("HistoryViewModel", "send: $prompt")
         viewModelScope.launch {
             detailedItem.value?.let { historyItem ->
@@ -173,7 +174,8 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
                         } else {
                             HistoryStatus.SUBMITTED
                         },
-                        prompt = prompt
+                        prompt = prompt,
+                        schema = schema
                     )
                 )
             }

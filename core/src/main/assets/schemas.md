@@ -18,5 +18,5 @@ Also you must provide a Settings section
 Run time params:
 - {package}: The package/namespace for the output code
 - {context}: The files context (used in System-loop)
-- {bullet_file}: The main bullet file to be rebulified
+- {main_file}: The main bullet file to be rebulified
 - {prompt}: User prompt for rebulification

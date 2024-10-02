@@ -60,7 +60,7 @@ class SelectedHistoryViewHolder(
         }
 
         binding.prompt.sendButton.setOnClickListener {
-            viewModel.send(binding.prompt.chatBox.text.toString())
+            viewModel.send(binding.prompt.chatBox.text.toString(), binding.prompt.schemaSpinner.selectedItem.toString())
         }
 
         binding.prompt.chatBox.addTextChangedListener {

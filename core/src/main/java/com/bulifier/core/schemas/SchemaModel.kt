@@ -2,17 +2,18 @@ package com.bulifier.core.schemas
 
 import android.content.Context
 import androidx.annotation.VisibleForTesting
-import com.bulifier.core.BuildConfig
 import com.bulifier.core.db.AppDatabase
+import com.bulifier.core.db.Content
+import com.bulifier.core.db.File
 import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaSettings
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
-import com.bulifier.core.utils.appVersionCode
-import io.ktor.util.toLowerCasePreservingASCIIRules
+import com.bulifier.core.prefs.Prefs
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
@@ -20,49 +21,102 @@ object SchemaModel {
     const val KEY_PACKAGE = "package"
     const val KEY_CONTEXT = "context"
     const val KEY_PROMPT = "prompt"
-    const val KEY_BULLET_FILE = "bullet_file"
+    const val KEY_MAIN_FILE = "main_file"
 
     private val keys = setOf(
         KEY_PACKAGE,
         KEY_CONTEXT,
         KEY_PROMPT,
-        KEY_BULLET_FILE
+        KEY_MAIN_FILE
     )
 
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Default + job)
     private lateinit var db: AppDatabase
+    private lateinit var appContext: Context
 
-    fun init(context: Context) {
-        db = context.db
-
-        val preferences = context.getSharedPreferences("schema", 0)
-        if (!BuildConfig.DEBUG && preferences.getLong("prepared", 0) >= context.appVersionCode) {
-            return
-        }
-
-        preferences.edit().putLong("prepared", context.appVersionCode).apply()
+    fun init(appContext: Context) {
+        db = appContext.db
+        this.appContext = appContext
 
         scope.launch {
-            prepareSchemasNow(context)
+            Prefs.projectId.flow.collectLatest {
+                if (it != -1L) {
+                    verifySchemas(it)
+                }
+            }
         }
     }
 
-
-
-    @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
-    suspend fun prepareSchemasNow(context: Context) {
+    private suspend fun verifySchemas(projectId: Long) {
         withContext(Dispatchers.IO) {
-            context.assets.list("schemas")?.map { fileName ->
-                context.assets.open("schemas/$fileName").bufferedReader().use {
+            if (!db.fileDao().isPathExists("schemas", projectId)) {
+                createDefaultSchemas(projectId)
+            }
+        }
+    }
+
+    private suspend fun createDefaultSchemas(projectId: Long) {
+        loadSystemDefaults(projectId)
+        reloadSchemas(projectId)
+    }
+
+    private suspend fun loadSystemDefaults(projectId: Long) {
+        db.fileDao().insertFile(
+            File(
+                path = "",
+                fileName = "schemas",
+                isFile = false,
+                projectId = projectId
+            )
+        )
+        resetSystemSchemas(projectId)
+    }
+
+    suspend fun resetSystemSchemas(projectId: Long) {
+        withContext(Dispatchers.IO) {
+            appContext.assets.list("schemas")?.map { fileName ->
+                appContext.assets.open("schemas/$fileName").bufferedReader().use {
                     val schemaData = it.readText()
-                    parseSchema(
-                        schemaData, fileName
-                            .split(".")
-                            .first()
+                    val fileId = db.fileDao().insertFile(
+                        File(
+                            path = "schemas",
+                            fileName = fileName,
+                            isFile = true,
+                            projectId = projectId
+                        )
+                    ).run {
+                        if(this == -1L){
+                            db.fileDao().getFileId(
+                                path = "schemas",
+                                fileName = fileName,
+                                projectId = projectId
+                            ) ?: return@withContext
+                        }
+                        else{
+                            this
+                        }
+                    }
+
+
+                    db.fileDao().insertContentAndUpdateFileSize(
+                        Content(
+                            fileId = fileId,
+                            content = schemaData
+                        )
                     )
                 }
-            }?.run {
+            }
+        }
+    }
+
+    suspend fun reloadSchemas(projectId: Long) {
+        withContext(Dispatchers.IO) {
+            db.fileDao().loadFilesByPath("schemas", projectId).map {
+                parseSchema(
+                    it.content, it.fileName.substringBeforeLast(".")
+                )
+            }.run {
                 val schemas = flatten()
                 val settings = schemas.filter { it.type == SchemaType.SETTINGS }.map {
                     val map = it.content.split("\n").associate { line ->
@@ -71,12 +125,13 @@ object SchemaModel {
                     }
                     SchemaSettings(
                         schemaName = it.schemaName,
-                        fileExtension = map["file extension"] ?: "bul",
+                        fileExtension = map["file extension"] ?: "txt",
                         runForEachFile = map["run for each file"] == "true",
-                        multiFilesOutput = map["multi files output"] == "true"
+                        multiFilesOutput = map["multi files output"] == "true",
+                        overrideFiles = map["override files"] == "true"
                     )
                 }
-                context.db.schemaDao().addSchemas(schemas, settings)
+                db.schemaDao().addSchemas(schemas.filter { it.type != SchemaType.SETTINGS }, settings)
             }
         }
     }
@@ -94,7 +149,8 @@ object SchemaModel {
         val headers = mutableListOf<String>()
         var lastIndex = 0
         for (match in matches) {
-            headers.add(match.value.substring(1).trim())
+            val value = match.value
+            headers.add(value.substring(1).trim())
             val section = content.substring(lastIndex, match.range.first).trim()
             if (section.isNotEmpty()) {
                 sections.add(section)

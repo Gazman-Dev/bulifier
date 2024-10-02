@@ -172,6 +172,20 @@ interface FileDao {
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
+        WHERE files.path = :path and project_id = :projectId"""
+    )
+    fun loadFilesByPath(
+        path: String,
+        projectId: Long
+    ): List<FileData>
+
+    @Query(
+        """SELECT 
+            files.file_name, 
+            files.path, 
+            contents.* 
+        FROM contents 
+            join files on contents.file_id = files.file_id
         WHERE project_id = :projectId"""
     )
     fun fetchFilesListByProjectId(
@@ -184,8 +198,16 @@ interface FileDao {
     @Query("SELECT * FROM files WHERE file_name LIKE :name")
     fun searchFilesByName(name: String): PagingSource<Int, File>
 
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertContent(content: Content): Long
+
+    @Transaction
+    suspend fun upsertContent(content: Content) {
+        val id = insertContent(content)
+        if (id == -1L) {
+            updateContent(content)
+        }
+    }
 
     @Update()
     suspend fun updateContent(content: Content): Int
@@ -195,7 +217,7 @@ interface FileDao {
 
     @Transaction
     suspend fun insertContentAndUpdateFileSize(content: Content) {
-        insertContent(content)
+        upsertContent(content)
         updateFileSize(content.fileId, content.content.length)
     }
 
@@ -276,6 +298,15 @@ interface FileDao {
         """
     )
     suspend fun getContent(path: String, fileName: String, projectId: Long): FileData?
+
+    @Query(
+        """SELECT 
+            files.path || '/' || files.file_name 
+        FROM files
+        WHERE (files.path || '/' || files.file_name) in (:fullFileName) and files.project_id = :projectId
+        """
+    )
+    suspend fun getFilesInList(fullFileName:List<String>, projectId: Long): List<String>
 
     @Query(
         """SELECT
@@ -428,6 +459,9 @@ interface FileDao {
         oldFolderPathLength: Int,
         projectId: Long
     )
+
+    @Query("SELECT count(*) > 0 FROM files WHERE path = :path AND project_id = :projectId")
+    suspend fun isPathExists(path:String, projectId:Long) : Boolean
 }
 
 data class FileData(

@@ -1,6 +1,6 @@
 package com.bulifier.core.prefs
 
-import android.app.Application
+import android.content.Context
 import android.content.SharedPreferences
 import com.bulifier.core.prefs.Prefs.pref
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -14,8 +14,8 @@ object Prefs {
     val path by lazy { PrefStringValue("path_v1") }
     val models by lazy { PrefListValue("models") }
 
-    fun initialize(bulyApp: Application) {
-        pref = bulyApp.getSharedPreferences("buly", 0)
+    fun initialize(context: Context) {
+        pref = context.getSharedPreferences("buly", 0)
     }
 
     fun put(key: String, value: String) {
