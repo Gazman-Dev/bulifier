@@ -13,8 +13,23 @@ Bulifier is an open-source project that leverages AI to revolutionize software d
 - **Bulify**: Convert your ideas into structured bullet points.
 - **Debulify**: Transform bullet points into various output formats (e.g., Python, Java, or prose).
 - **Rebulify**: Update existing bullet point files with new features or modifications.
+- **Schema Management**: Create and update schemas to customize Bulifier for your specific needs.
 
 Bulifier envisions a future where developers focus on high-level logic while AI handles the code generation, allowing software development to shift from laptops to mobile devices.
+
+## New Feature: Schema Management
+
+Bulifier now allows you to update existing schemas and create new ones, unlocking a whole new realm of possibilities:
+
+- **Personalized Project Scopes**: Incorporate your project scope directly into the schema for tailored content generation.
+- **Diverse Content Generation**: Create schemas for various content types like books, documentation, and more.
+- **Customizable Developer Schemas**: Pre-defined schemas for code writing can be updated to suit your needs.
+
+### How to Use Schema Management
+
+1. **Manual Creation**: Create new schema files manually for custom content types.
+2. **Bulk Updates**: Use the new update-schema schema to modify all schemas at once.
+3. **Schema Customization**: Tailor the update-schema schema itself for even more flexibility.
 
 ## Getting Started & Contributing
 
