@@ -27,8 +27,6 @@ android {
     defaultConfig {
         minSdk 23
         targetSdk 34
-        versionCode 1
-        versionName "1.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField "String", "OPEN_AI_KEY", '""'
@@ -72,7 +70,7 @@ private static def getPropertyQuoted(String propName, Properties properties) {
 dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
-    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.5"
+    implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6"
     implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
 
     implementation "io.ktor:ktor-client-okhttp:2.1.0"
@@ -91,9 +89,9 @@ dependencies {
 
     implementation "androidx.paging:paging-runtime-ktx:3.3.2"
     implementation "androidx.paging:paging-common-ktx:3.3.2"
-    implementation "androidx.navigation:navigation-fragment-ktx:2.8.0"
-    implementation "androidx.navigation:navigation-ui-ktx:2.8.0"
-    implementation "androidx.navigation:navigation-runtime-ktx:2.8.0"
+    implementation "androidx.navigation:navigation-fragment-ktx:2.8.2"
+    implementation "androidx.navigation:navigation-ui-ktx:2.8.2"
+    implementation "androidx.navigation:navigation-runtime-ktx:2.8.2"
 
     implementation 'com.tbuonomo:dotsindicator:5.0'
     implementation 'androidx.core:core-ktx:1.13.1'
