@@ -2,7 +2,6 @@ package com.bulifier.core.ui.content
 
 import android.annotation.SuppressLint
 import android.os.Bundle
-import android.text.TextWatcher
 import android.text.method.ScrollingMovementMethod
 import android.util.Log
 import android.view.GestureDetector
@@ -24,9 +23,7 @@ import kotlinx.coroutines.launch
 class FileContentFragment : Fragment() {
 
     private lateinit var binding: CoreFileContentFragmentBinding
-    private val viewModel by activityViewModels<MainViewModel>()
-    private var dirty = false
-    private var systemText = ""
+    private val viewModel: MainViewModel by activityViewModels<MainViewModel>()
     private val historyViewModel by activityViewModels<HistoryViewModel>()
 
     override fun onCreateView(
@@ -40,75 +37,41 @@ class FileContentFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        val ticker = Ticker(viewLifecycleOwner) {
-            updateContent()
-        }
+        val textWatcher = ContentTextWatcher(
+            binding.textBox,
+            viewModel,
+            viewLifecycleOwner
+        )
         binding.ai.setOnClickListener {
             viewModel.fullPath.value.run {
                 historyViewModel.createNewAiJob(path, fileName)
             }
             findNavController().navigate(R.id.aiHistoryFragment)
         }
-        var text = ""
         binding.textBox.movementMethod = ScrollingMovementMethod()
         binding.textBoxView.movementMethod = ScrollingMovementMethod()
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.fileContent.collect {
                 Log.d("FileContentFragment", "UI: updated from model\n\n$it\n\n")
-                systemText = it
-                dirty = false
-                ticker.reset()
-                binding.textBox.setText(it)
+                textWatcher.update(it)
                 binding.textBoxView.text = it
             }
         }
 
-        binding.textBox.addTextChangedListener(object : TextWatcher {
-
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-
-            }
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-
-            }
-
-            override fun afterTextChanged(s: android.text.Editable?) {
-                val newText = s.toString()
-                if(newText == systemText){
-                    return
-                }
-                dirty = text != newText
-                text = newText
-                binding.textBoxView.text = newText
-
-                Log.d("FileContentFragment", "UI: Text updated ${newText.length}")
-            }
-        })
-
         binding.editMode.setOnCheckedChangeListener { _, isChecked ->
             binding.horizontalScrollViewEditText.isVisible = isChecked
             binding.horizontalScrollViewTextView.isVisible = !isChecked
-            binding.textBoxView.text = binding.textBox.text
+            binding.textBoxView.isVisible = !isChecked
+
+            if (isChecked) {
+                textWatcher.start(binding.textBoxView.text.toString())
+            } else {
+                binding.textBoxView.text = binding.textBox.text
+                textWatcher.stop()
+            }
         }
 
         setupDoubleTop()
-
-
-    }
-
-    private fun updateContent() {
-        if (dirty) {
-            dirty = false
-            val content = binding.textBox.text.toString()
-            viewModel.updateFileContent(content)
-            Log.d("FileContentFragment", "UI: viewModel updated\n\n$content\n\n")
-        }
-    }
-
-    override fun onPause() {
-        updateContent()
-        super.onPause()
     }
 
     @SuppressLint("ClickableViewAccessibility")
