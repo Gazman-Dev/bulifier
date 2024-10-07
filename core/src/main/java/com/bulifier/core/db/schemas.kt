@@ -1,5 +1,6 @@
 package com.bulifier.core.db
 
+import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.Entity
@@ -50,6 +51,7 @@ class DateTypeConverter {
 class LongListConverter {
     @TypeConverter
     fun fromLongList(value: List<Long>): String {
+
         return value.joinToString()
     }
 
