@@ -27,8 +27,9 @@ import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreMainFragmentBinding
 import com.bulifier.core.databinding.PopupCheckoutBinding
 import com.bulifier.core.databinding.PopupCloneBinding
-import com.bulifier.core.databinding.PopupPullBinding
 import com.bulifier.core.databinding.PopupPushBinding
+import com.bulifier.core.git.GitError
+import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
@@ -38,6 +39,9 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+import org.eclipse.jgit.transport.CredentialItem
+import org.eclipse.jgit.transport.URIish
+import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
 
 
 data class TitleAction(val title: String, val action: () -> Unit)
@@ -45,6 +49,7 @@ data class TitleAction(val title: String, val action: () -> Unit)
 class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
     private val viewModel by activityViewModels<MainViewModel>()
+    private val gitViewModel by activityViewModels<GitViewModel>()
     private val historyViewModel by activityViewModels<HistoryViewModel>()
     private val filesAdapter by lazy { FilesAdapter(viewModel) }
     private val errorPattern by lazy { Regex("[a-zA-Z0-9]+\\.") }
@@ -102,7 +107,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                     when (it.itemId) {
                         R.id.clone -> clone()
                         R.id.checkout -> checkout()
-                        R.id.pull -> pull()
+                        R.id.pull -> gitViewModel.pull()
                         R.id.push -> push()
                         else -> Unit
                     }
@@ -121,6 +126,15 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
         binding.resetSchemasButton.setOnClickListener {
             viewModel.resetSystemSchemas()
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            gitViewModel.gitErrors.collect { gitError ->
+                when (gitError.type) {
+                    "clone" -> showCloneError(gitError)
+                    else -> showGeneralError(gitError)
+                }
+            }
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -155,11 +169,44 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
         requireActivity().onBackPressedDispatcher.addCallback(callback)
         viewLifecycleOwner.lifecycleScope.launch {
-            viewModel.gitInfo.collect {
+            gitViewModel.gitInfo.collect {
                 binding.bottomBar.info.text = it
             }
         }
     }
+
+    private fun showGeneralError(gitError: GitError) {
+        AlertDialog.Builder(requireContext()).apply {
+            setTitle(gitError.title)
+            setMessage(gitError.message)
+            setPositiveButton("Ok") { _, _ ->
+            }
+            setCancelable(false)
+            show()
+        }
+    }
+
+    private fun showCloneError(gitError: GitError) {
+        AlertDialog.Builder(requireContext()).apply {
+            setTitle("Clone Failed")
+            setMessage(
+                """${gitError.message}
+
+The Git repository couldn't be cloned. You can delete the existing Git folder and retry cloning manually.
+
+Note: Your Bulifier project files are safely stored in our database and won't be impacted by this action. Deleting the Git folder will only affect the repository, not your project data."""
+            )
+            setPositiveButton("Delete Git Folder") { _, _ ->
+                gitViewModel.deleteGit() // This deletes the Git folder
+            }
+            setNegativeButton("Cancel") { _, _ ->
+
+            }
+            setCancelable(false)
+            show()
+        }
+    }
+
 
     private fun push() {
         val binding = PopupPushBinding.inflate(layoutInflater)
@@ -169,19 +216,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             .setPositiveButton("Push") { _, _ ->
                 val commitMessage = binding.commitMessage.text.toString()
                     .ifEmpty { "Made some changes..." }
-                viewModel.push(commitMessage)
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
-    }
-
-    private fun pull() {
-        val binding = PopupPullBinding.inflate(layoutInflater)
-        AlertDialog.Builder(requireActivity())
-            .setTitle("Pull from Remote")
-            .setView(binding.root)
-            .setPositiveButton("Pull") { _, _ ->
-                viewModel.pull()
+                gitViewModel.push(commitMessage)
             }
             .setNegativeButton("Cancel", null)
             .show()
@@ -190,7 +225,11 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
     private fun checkout(): AlertDialog? {
         val binding = PopupCheckoutBinding.inflate(layoutInflater)
         viewLifecycleOwner.lifecycleScope.launch {
-            val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, viewModel.getBranches())
+            val adapter = ArrayAdapter(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                gitViewModel.getBranches()
+            )
             binding.branchName.setAdapter(adapter)
         }
         return AlertDialog.Builder(requireActivity())
@@ -199,7 +238,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             .setPositiveButton("Checkout") { _, _ ->
                 val branchName = binding.branchName.text.toString()
                 if (branchName.isNotEmpty()) {
-                    viewModel.checkout(branchName)
+                    gitViewModel.checkout(branchName)
                 } else {
                     showErrorDialog(
                         requireActivity(),
@@ -213,6 +252,20 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
     private fun clone(): AlertDialog? {
         val binding = PopupCloneBinding.inflate(layoutInflater)
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            gitViewModel.getCredentials().apply {
+                if (this is UsernamePasswordCredentialsProvider) {
+                    val password = CredentialItem.Password()
+                    val username = CredentialItem.Username()
+                    get(URIish(), password, username)
+                    binding.username.setText(username.value)
+                    binding.passwordToken.setText(String(password.value))
+                }
+            }
+        }
+
+
         return AlertDialog.Builder(requireActivity())
             .setTitle("Clone Repository")
             .setView(binding.root)
@@ -224,7 +277,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
 
                 if (repoUrl.isNotEmpty() && username.isNotEmpty() && passwordToken.isNotEmpty()) {
                     // Trigger cloning process with JGit here
-                    viewModel.clone(repoUrl, username, passwordToken)
+                    gitViewModel.clone(repoUrl, username, passwordToken)
                 } else {
                     showErrorDialog(
                         requireActivity(),

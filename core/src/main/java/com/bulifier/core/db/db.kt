@@ -3,6 +3,7 @@
 package com.bulifier.core.db
 
 import ProjectExporter
+import android.app.Application
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
@@ -154,6 +155,10 @@ interface FileDao {
     @Transaction
     suspend fun exportProject(context: Context, projectId: Long) =
         ProjectExporter(context).exportProject(projectId)
+
+    @Transaction
+    suspend fun importProject(context: Context, projectId: Long) =
+        ProjectExporter(context).importProject(projectId)
 
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
@@ -478,6 +483,9 @@ interface FileDao {
     """
     )
     suspend fun exportFilesAndContents(projectId: Long): List<FileData>
+
+    @Query("DELETE FROM files WHERE project_id = :projectId")
+    suspend fun deleteFilesByProjectId(projectId: Long)
 }
 
 data class FileData(

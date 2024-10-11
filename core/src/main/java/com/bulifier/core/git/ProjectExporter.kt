@@ -1,16 +1,73 @@
 import android.content.Context
-import com.bulifier.core.db.AppDatabase
+import com.bulifier.core.db.Content
 import com.bulifier.core.db.db
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import java.io.File
+import com.bulifier.core.db.File as DbFile
 
 class ProjectExporter(
     private val context: Context
 ) {
 
     private val db = context.db
-    suspend fun exportProject(projectId: Long)  {
+
+    suspend fun importProject(projectId: Long) {
+        // Fetch the project name from the database
+        val projectName = db.fileDao().getProjectById(projectId).projectName
+
+        // Define the project directory
+        val projectDir = File(context.filesDir, projectName)
+        val srcDir = File(projectDir, "src")
+        val schemasDir = File(projectDir, "schemas")
+
+        db.fileDao().deleteFilesByProjectId(projectId)
+
+        // Process the src directory with an empty path
+        processDirectory(srcDir, "", projectId)
+
+        // Process the schemas directory with path "schemas"
+        processDirectory(schemasDir, "schemas", projectId)
+    }
+
+    private suspend fun processDirectory(currentDir: File, parentPath: String, projectId: Long) {
+        if (!currentDir.exists()) return
+
+        currentDir.listFiles()?.forEach { file ->
+            val fileName = file.name
+            val isFile = file.isFile
+            val size = if (isFile) file.length().toInt() else 0
+            val path = parentPath
+
+            // Create and insert the File entity
+            val fileEntity = DbFile(
+                projectId = projectId,
+                path = path,
+                fileName = fileName,
+                isFile = isFile,
+                size = size
+            )
+            val fileId = db.fileDao().insertFile(fileEntity)
+
+            if (isFile) {
+                // Read the file content and insert the Content entity
+                val content = file.readText()
+                val contentEntity = Content(
+                    fileId = fileId,
+                    content = content,
+                    type = Content.Type.NONE // Adjust the type as needed
+                )
+                db.fileDao().insertContent(contentEntity)
+            } else {
+                // Insert the directory with isFile = false
+                // Calculate the new parent path
+                val newParentPath = if (parentPath.isEmpty()) fileName else "$parentPath/$fileName"
+                // Recursively process the subdirectory
+                processDirectory(file, newParentPath, projectId)
+            }
+        }
+    }
+
+
+    suspend fun exportProject(projectId: Long) {
         // Fetch the project name from the database or pass it as a parameter
         val projectName = db.fileDao().getProjectById(projectId).projectName
         val srcDir = context.filesDir.createOverrideEmptyDirectory("$projectName/src")

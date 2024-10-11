@@ -16,16 +16,8 @@ object GitHelper {
     ) {
         withContext(Dispatchers.IO) {
             Git.open(repoDir).use { git ->
-                val currentBranch = git.repository.branch
-
-                git.fetch()
+                git.pull()
                     .setCredentialsProvider(credentials)
-                    .call()
-
-
-                git.reset()
-                    .setMode(ResetCommand.ResetType.HARD)
-                    .setRef("refs/remotes/origin/$currentBranch")
                     .call()
             }
         }

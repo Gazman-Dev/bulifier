@@ -29,7 +29,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.eclipse.jgit.transport.CredentialsProvider
-import kotlin.time.Duration
 
 data class FullPath(
     val fileName: String?,
@@ -45,9 +44,6 @@ data class FileInfo(
 class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     private val db by lazy { app.db.fileDao() }
-    private val credentials = SecureCredentialManager(app)
-
-    val gitInfo: StateFlow<String> = MutableStateFlow("idle")
 
     val projectsFlow = Pager(
         config = PagingConfig(
@@ -67,7 +63,6 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            resetGitInfo()
             _openedFile.collectLatest { fileInfo ->
                 if (fileInfo != null) {
                     Log.d("MainViewModel", "open file ${fileInfo.fileId}")
@@ -294,117 +289,9 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private val repoDir: java.io.File
-        get() = java.io.File(app.filesDir, projectName.flow.value)
 
-    private fun resetGitInfo() {
-        viewModelScope.launch {
-            gitInfo as MutableStateFlow
-            gitInfo.value = if (GitHelper.isCloneNeeded(repoDir)) {
-                "Git: Pending Clone"
-            } else {
-                try {
-                    "Git: ${GitHelper.currentBranch(repoDir)}"
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    "Git: Error " + e.message
-                }
-            }
-        }
-    }
 
-    fun pull() {
-        viewModelScope.launch {
-            try {
-                updateGitInfo("Pulling")
-                val creds = fetchCredentials() ?: return@launch
-                GitHelper.pull(repoDir, creds)
-                markGitInfoSuccess()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateGitInfo("Error pulling")
-            }
-        }
-    }
 
-    fun push(commitMessage: String) {
-        viewModelScope.launch {
-            try {
-                updateGitInfo("Pulling")
-                val creds = fetchCredentials() ?: return@launch
-                GitHelper.pull(repoDir, creds)
-                updateGitInfo("Cleaning")
-                withContext(Dispatchers.IO) {
-                    deleteAllFilesInFolder(java.io.File(repoDir, "src"))
-                    deleteAllFilesInFolder(java.io.File(repoDir, "schemas"))
-                }
-                updateGitInfo("Exporting DB")
-                db.exportProject(app, projectId.flow.value)
-                updateGitInfo("Pushing")
-                GitHelper.push(repoDir, creds, commitMessage)
-                markGitInfoSuccess()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateGitInfo("Error pulling")
-            }
-        }
-    }
-
-    fun clone(repoUrl: String, username: String, passwordToken: String) {
-        viewModelScope.launch {
-            updateGitInfo("Cloning")
-            credentials.saveCredentials(projectId.flow.value, username, passwordToken)
-            val creds = fetchCredentials() ?: return@launch
-
-            try {
-                deleteAllFilesInFolder(repoDir)
-                GitHelper.clone(repoDir, creds, repoUrl)
-                markGitInfoSuccess()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateGitInfo("Error cloning")
-            }
-        }
-    }
-
-    private fun updateGitInfo(message: String) {
-        gitInfo as MutableStateFlow
-        gitInfo.value = message
-    }
-
-    fun checkout(branchName: String) {
-        viewModelScope.launch {
-            updateGitInfo("Checking out")
-            try {
-                val creds = fetchCredentials() ?: return@launch
-                GitHelper.checkout(repoDir, creds, branchName)
-                markGitInfoSuccess()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                updateGitInfo("Error Checking out")
-            }
-
-        }
-    }
-
-    private suspend fun markGitInfoSuccess() {
-        updateGitInfo("Success!")
-        delay(1000)
-        resetGitInfo()
-    }
-
-    private suspend fun fetchCredentials(): CredentialsProvider? {
-        return credentials.retrieveCredentials(projectId.flow.value).apply {
-            if (this == null) {
-                updateGitInfo("Credentials error")
-            }
-        }
-    }
-
-    suspend fun getBranches() = try {
-        GitHelper.branches(repoDir)
-    } catch (e: Exception) {
-        e.printStackTrace()
-        emptyList()
-    }
 }
+
+
