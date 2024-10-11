@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Pushing to the remote branch will first perform a hard reset to ensure the local files are in sync with the remote branch. All files in the 'src' and 'schema' directories will be removed. Then, your database files will be exported to these directories and committed. Afterward, a git push will be performed."
+        android:paddingBottom="8dp"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <EditText
+        android:id="@+id/commit_message"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Optional Commit Message"
+        android:inputType="text" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Are you sure you want to proceed?"
+        android:paddingTop="8dp"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+</LinearLayout>

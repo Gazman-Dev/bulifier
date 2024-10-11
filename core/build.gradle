@@ -68,7 +68,7 @@ private static def getPropertyQuoted(String propName, Properties properties) {
 }
 
 dependencies {
-    implementation 'org.eclipse.jgit:org.eclipse.jgit:7.0.0.202409031743-r'
+    implementation project(":jgit")
 
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- res/menu/popup_menu.xml -->
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:id="@+id/clone"
+        android:icon="@drawable/baseline_clone_maker_24"
+        android:title="Clone" />
+    <item
+        android:id="@+id/checkout"
+        android:icon="@drawable/baseline_coffee_24"
+        android:title="Checkout" />
+    <item
+        android:id="@+id/pull"
+        android:icon="@drawable/baseline_cloud_download_24"
+        android:title="Pull" />
+    <item
+        android:id="@+id/push"
+        android:icon="@drawable/baseline_cloud_upload_24"
+        android:title="Push &amp; Commit" />
+</menu>

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Pulling from the remote will perform a hard reset to the current branch in local storage. This action will not affect your project files managed in the database. To load the updated files from local storage into your project, you will need to explicitly call 'Load Project'."
+        android:paddingBottom="8dp"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Are you sure you want to proceed?"
+        android:paddingTop="8dp"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+</LinearLayout>

@@ -1,0 +1,3 @@
+[submodule "jgit"]
+	path = jgit
+	url = https://github.com/Gazman-Dev/jgit.git

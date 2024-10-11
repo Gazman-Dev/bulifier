@@ -12,9 +12,12 @@ import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -22,15 +25,20 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreMainFragmentBinding
+import com.bulifier.core.databinding.PopupCheckoutBinding
+import com.bulifier.core.databinding.PopupCloneBinding
+import com.bulifier.core.databinding.PopupPullBinding
+import com.bulifier.core.databinding.PopupPushBinding
 import com.bulifier.core.prefs.Prefs
-import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
+import com.bulifier.core.ui.utils.showErrorDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
+
 
 data class TitleAction(val title: String, val action: () -> Unit)
 
@@ -80,14 +88,28 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             findNavController().navigate(R.id.aiHistoryFragment)
         }
         binding.bottomBar.ai.setOnClickListener {
-            viewModel.fullPath.value?.run {
+            viewModel.fullPath.value.run {
                 historyViewModel.createNewAiJob(path, fileName)
             }
             findNavController().navigate(R.id.aiHistoryFragment)
         }
 
-        binding.bottomBar.downloadButton.setOnClickListener {
-            viewModel.shareFiles()
+        binding.bottomBar.gitButton.setOnClickListener {
+            PopupMenu(requireContext(), binding.bottomBar.gitButton).apply {
+                inflate(R.menu.git_menu)
+                setForceShowIcon(true)
+                setOnMenuItemClickListener {
+                    when (it.itemId) {
+                        R.id.clone -> clone()
+                        R.id.checkout -> checkout()
+                        R.id.pull -> pull()
+                        R.id.push -> push()
+                        else -> Unit
+                    }
+                    true
+                }
+                show()
+            }
         }
 
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
@@ -102,11 +124,10 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            Prefs.path.flow.combine(viewModel.openedFile){ path, openFile ->
-                if(openFile != null){
+            Prefs.path.flow.combine(viewModel.openedFile) { path, openFile ->
+                if (openFile != null) {
                     null
-                }
-                else{
+                } else {
                     path
                 }
             }.collectLatest {
@@ -133,6 +154,86 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         }
 
         requireActivity().onBackPressedDispatcher.addCallback(callback)
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.gitInfo.collect {
+                binding.bottomBar.info.text = it
+            }
+        }
+    }
+
+    private fun push() {
+        val binding = PopupPushBinding.inflate(layoutInflater)
+        AlertDialog.Builder(requireActivity())
+            .setTitle("Push to Remote")
+            .setView(binding.root)
+            .setPositiveButton("Push") { _, _ ->
+                val commitMessage = binding.commitMessage.text.toString()
+                    .ifEmpty { "Made some changes..." }
+                viewModel.push(commitMessage)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun pull() {
+        val binding = PopupPullBinding.inflate(layoutInflater)
+        AlertDialog.Builder(requireActivity())
+            .setTitle("Pull from Remote")
+            .setView(binding.root)
+            .setPositiveButton("Pull") { _, _ ->
+                viewModel.pull()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun checkout(): AlertDialog? {
+        val binding = PopupCheckoutBinding.inflate(layoutInflater)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val adapter = ArrayAdapter(requireContext(), android.R.layout.simple_dropdown_item_1line, viewModel.getBranches())
+            binding.branchName.setAdapter(adapter)
+        }
+        return AlertDialog.Builder(requireActivity())
+            .setTitle("Checkout Branch")
+            .setView(binding.root)
+            .setPositiveButton("Checkout") { _, _ ->
+                val branchName = binding.branchName.text.toString()
+                if (branchName.isNotEmpty()) {
+                    viewModel.checkout(branchName)
+                } else {
+                    showErrorDialog(
+                        requireActivity(),
+                        "Please fill in all fields."
+                    )
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun clone(): AlertDialog? {
+        val binding = PopupCloneBinding.inflate(layoutInflater)
+        return AlertDialog.Builder(requireActivity())
+            .setTitle("Clone Repository")
+            .setView(binding.root)
+            .setPositiveButton("Clone") { _, _ ->
+                // Handle "Execute" action here
+                val repoUrl = binding.repoUrl.text.toString()
+                val username = binding.username.text.toString()
+                val passwordToken = binding.passwordToken.text.toString()
+
+                if (repoUrl.isNotEmpty() && username.isNotEmpty() && passwordToken.isNotEmpty()) {
+                    // Trigger cloning process with JGit here
+                    viewModel.clone(repoUrl, username, passwordToken)
+                } else {
+                    showErrorDialog(
+                        requireActivity(),
+                        "Please fill in all fields."
+                    )
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun registerPath() {

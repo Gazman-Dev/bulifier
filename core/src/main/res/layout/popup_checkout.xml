@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Checking out a branch will update local storage files but will not affect your project files managed in the database. You need to explicitly call 'Load Project' to load files from local storage into the project."
+        android:paddingBottom="8dp"
+        android:textAppearance="?android:attr/textAppearanceMedium" />
+
+    <AutoCompleteTextView
+        android:id="@+id/branch_name"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Branch Name"
+        android:inputType="text"
+        android:completionThreshold="1" />
+</LinearLayout>
