@@ -66,7 +66,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun push(commitMessage: String) {
+    fun push() {
         viewModelScope.launch {
             try {
                 db.dbToFiles(app, projectId.flow.value)
@@ -76,7 +76,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
                 }
                 updateGitInfo("Pushing")
                 val creds = fetchCredentials() ?: return@launch
-                GitHelper.push(repoDir, creds, commitMessage)
+                GitHelper.push(repoDir, creds)
                 markGitInfoSuccess()
             } catch (e: Exception) {
                 reportError(e, "Push")
@@ -118,14 +118,14 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         resetGitInfo()
     }
 
-    fun commit(){
+    fun commit(commitMessage: String){
         viewModelScope.launch {
             try {
                 updateGitInfo("Syncing local storage")
                 db.dbToFiles(app, projectId.flow.value)
                 updateGitInfo("Committing")
                 withContext(Dispatchers.IO) {
-                    GitHelper.commit(repoDir)
+                    GitHelper.commit(repoDir, commitMessage)
                 }
                 markGitInfoSuccess()
             } catch (e: Exception) {
@@ -137,12 +137,12 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     fun checkout(branchName: String, isNew:Boolean) {
         viewModelScope.launch {
             try {
+                updateGitInfo("Syncing local storage")
+                db.dbToFiles(app, projectId.flow.value)
                 if(!GitHelper.isClean(repoDir)){
                     sendError("Commit before checking out", "Checkout Error")
                     return@launch
                 }
-                updateGitInfo("Syncing local storage")
-                db.dbToFiles(app, projectId.flow.value)
                 updateGitInfo("Checking out")
                 GitHelper.checkout(repoDir, branchName, isNew)
                 updateGitInfo("Syncing DB")

@@ -23,18 +23,9 @@ object GitHelper {
 
     suspend fun push(
         repoDir: File,
-        credentials: CredentialsProvider,
-        commitMessage: String = "Made some changes"
-    ) = withContext(Dispatchers.IO) {
+        credentials: CredentialsProvider
+    ): MutableIterable<Any>? = withContext(Dispatchers.IO) {
         Git.open(repoDir).use { git ->
-            git.add()
-                .addFilepattern(".")
-                .call()
-
-            git.commit()
-                .setMessage(commitMessage)
-                .call()
-
             git.push()
                 .setCredentialsProvider(credentials)
                 .call()
@@ -120,14 +111,14 @@ object GitHelper {
         return !repoDir.exists() || !File(repoDir, ".git").exists()
     }
 
-    fun commit(repoDir: File) {
+    fun commit(repoDir: File, commitMessage: String) {
         Git.open(repoDir).use { git ->
             git.add()
                 .addFilepattern(".")
                 .setUpdate(true) // include deleted files
                 .call()
             git.commit()
-                .setMessage("Made some changes")
+                .setMessage(commitMessage)
                 .call()
         }
     }

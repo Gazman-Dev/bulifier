@@ -106,8 +106,8 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                         R.id.clone -> clone()
                         R.id.checkout -> checkout()
                         R.id.pull -> gitViewModel.pull()
-                        R.id.push -> push()
-                        R.id.commit -> gitViewModel.commit()
+                        R.id.push -> gitViewModel.push()
+                        R.id.commit -> commit()
                         else -> Unit
                     }
                     true
@@ -198,24 +198,22 @@ Note: Your Bulifier project files are safely stored in our database and won't be
             setPositiveButton("Delete Git Folder") { _, _ ->
                 gitViewModel.deleteGit() // This deletes the Git folder
             }
-            setNegativeButton("Cancel") { _, _ ->
-
-            }
+            setNegativeButton("Cancel", null)
             setCancelable(false)
             show()
         }
     }
 
 
-    private fun push() {
+    private fun commit() {
         val binding = PopupPushBinding.inflate(layoutInflater)
         AlertDialog.Builder(requireActivity())
-            .setTitle("Push to Remote")
+            .setTitle("Commit to local")
             .setView(binding.root)
-            .setPositiveButton("Push") { _, _ ->
+            .setPositiveButton("Commit") { _, _ ->
                 val commitMessage = binding.commitMessage.text.toString()
                     .ifEmpty { "Made some changes..." }
-                gitViewModel.push(commitMessage)
+                gitViewModel.commit(commitMessage)
             }
             .setNegativeButton("Cancel", null)
             .show()
