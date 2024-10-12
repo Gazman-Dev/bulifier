@@ -4,7 +4,7 @@ import com.bulifier.core.db.db
 import java.io.File
 import com.bulifier.core.db.File as DbFile
 
-class ProjectExporter(
+class DbSyncHelper(
     private val context: Context
 ) {
 

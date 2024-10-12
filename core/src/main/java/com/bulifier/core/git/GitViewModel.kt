@@ -53,24 +53,15 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             try {
                 updateGitInfo("Syncing Local Storage")
-                db.exportProject(app, projectId.flow.value)
+                db.dbToFiles(app, projectId.flow.value)
                 val creds = fetchCredentials() ?: return@launch
                 updateGitInfo("Pulling")
                 GitHelper.pull(repoDir, creds)
                 updateGitInfo("Syncing DB")
-                db.importProject(app, projectId.flow.value)
+                db.filesToDb(app, projectId.flow.value)
                 markGitInfoSuccess()
             } catch (e: Exception) {
-                e.printStackTrace()
-                gitErrors as MutableSharedFlow
-                gitErrors.emit(
-                    GitError(
-                        message = e.message ?: "Unknown error",
-                        title = "Pull Error",
-                        type = "pull"
-                    )
-                )
-                resetGitInfo()
+                reportError(e, "Pull")
             }
         }
     }
@@ -78,24 +69,25 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     fun push(commitMessage: String) {
         viewModelScope.launch {
             try {
-                updateGitInfo("Pulling")
-                val creds = fetchCredentials() ?: return@launch
-                GitHelper.pull(repoDir, creds)
-                updateGitInfo("Cleaning")
-                withContext(Dispatchers.IO) {
-                    deleteAllFilesInFolder(java.io.File(repoDir, "src"))
-                    deleteAllFilesInFolder(java.io.File(repoDir, "schemas"))
+                db.dbToFiles(app, projectId.flow.value)
+                if(!GitHelper.isClean(repoDir)){
+                    sendError("Commit before pushing", "Push Error")
+                    return@launch
                 }
-                updateGitInfo("Exporting DB")
-                db.exportProject(app, projectId.flow.value)
                 updateGitInfo("Pushing")
+                val creds = fetchCredentials() ?: return@launch
                 GitHelper.push(repoDir, creds, commitMessage)
                 markGitInfoSuccess()
             } catch (e: Exception) {
-                e.printStackTrace()
-                updateGitInfo("Error pulling")
+                reportError(e, "Push")
             }
         }
+    }
+
+    private suspend fun sendError(message: String, title: String) {
+        gitErrors as MutableSharedFlow
+        gitErrors.emit(GitError(message, title, "error"))
+        resetGitInfo()
     }
 
     fun clone(repoUrl: String, username: String, passwordToken: String) {
@@ -106,18 +98,11 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
 
             try {
                 GitHelper.clone(repoDir, creds, repoUrl)
+                updateGitInfo("Syncing DB")
+                db.filesToDb(app, projectId.flow.value)
                 markGitInfoSuccess()
             } catch (e: Exception) {
-                gitErrors as MutableSharedFlow
-                gitErrors.emit(
-                    GitError(
-                        message = e.message ?: "Unknown error",
-                        title = "Clone Error",
-                        type = "clone"
-                    )
-                )
-                e.printStackTrace()
-                resetGitInfo()
+                reportError(e, "Clone")
             }
         }
     }
@@ -127,19 +112,62 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         gitInfo.value = message
     }
 
-    fun checkout(branchName: String) {
+    suspend fun fetch(){
+        updateGitInfo("Fetching")
+        GitHelper.fetch(repoDir, fetchCredentials() ?: return)
+        resetGitInfo()
+    }
+
+    fun commit(){
         viewModelScope.launch {
-            updateGitInfo("Checking out")
             try {
-                val creds = fetchCredentials() ?: return@launch
-                GitHelper.checkout(repoDir, creds, branchName)
+                updateGitInfo("Syncing local storage")
+                db.dbToFiles(app, projectId.flow.value)
+                updateGitInfo("Committing")
+                withContext(Dispatchers.IO) {
+                    GitHelper.commit(repoDir)
+                }
                 markGitInfoSuccess()
             } catch (e: Exception) {
-                e.printStackTrace()
-                updateGitInfo("Error Checking out")
+                reportError(e, "Commit")
             }
-
         }
+    }
+
+    fun checkout(branchName: String, isNew:Boolean) {
+        viewModelScope.launch {
+            try {
+                if(!GitHelper.isClean(repoDir)){
+                    sendError("Commit before checking out", "Checkout Error")
+                    return@launch
+                }
+                updateGitInfo("Syncing local storage")
+                db.dbToFiles(app, projectId.flow.value)
+                updateGitInfo("Checking out")
+                GitHelper.checkout(repoDir, branchName, isNew)
+                updateGitInfo("Syncing DB")
+                db.filesToDb(app, projectId.flow.value)
+                markGitInfoSuccess()
+            } catch (e: Exception) {
+                reportError(e, "Checkout")
+            }
+        }
+    }
+
+    private suspend fun reportError(
+        e: Exception,
+        type: String
+    ) {
+        e.printStackTrace()
+        gitErrors as MutableSharedFlow
+        gitErrors.emit(
+            GitError(
+                message = e.message ?: "Unknown error",
+                title = "$type Error",
+                type = type.lowercase()
+            )
+        )
+        resetGitInfo()
     }
 
     private suspend fun markGitInfoSuccess() {
@@ -163,6 +191,13 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         emptyList()
     }
 
+    suspend fun getTags() = try {
+        GitHelper.tags(repoDir)
+    } catch (e: Exception) {
+        e.printStackTrace()
+        emptyList()
+    }
+
     fun deleteGit() {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -173,7 +208,6 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun getCredentials() = credentials.retrieveCredentials(projectId.flow.value)
-
 }
 
 data class GitError(

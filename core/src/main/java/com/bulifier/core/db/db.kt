@@ -2,8 +2,7 @@
 
 package com.bulifier.core.db
 
-import ProjectExporter
-import android.app.Application
+import DbSyncHelper
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
@@ -153,12 +152,12 @@ interface HistoryDao {
 interface FileDao {
 
     @Transaction
-    suspend fun exportProject(context: Context, projectId: Long) =
-        ProjectExporter(context).exportProject(projectId)
+    suspend fun dbToFiles(context: Context, projectId: Long) =
+        DbSyncHelper(context).exportProject(projectId)
 
     @Transaction
-    suspend fun importProject(context: Context, projectId: Long) =
-        ProjectExporter(context).importProject(projectId)
+    suspend fun filesToDb(context: Context, projectId: Long) =
+        DbSyncHelper(context).importProject(projectId)
 
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>

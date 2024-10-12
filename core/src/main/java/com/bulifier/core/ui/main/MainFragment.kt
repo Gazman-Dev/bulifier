@@ -12,7 +12,6 @@ import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
@@ -25,7 +24,6 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreMainFragmentBinding
-import com.bulifier.core.databinding.PopupCheckoutBinding
 import com.bulifier.core.databinding.PopupCloneBinding
 import com.bulifier.core.databinding.PopupPushBinding
 import com.bulifier.core.git.GitError
@@ -109,6 +107,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                         R.id.checkout -> checkout()
                         R.id.pull -> gitViewModel.pull()
                         R.id.push -> push()
+                        R.id.commit -> gitViewModel.commit()
                         else -> Unit
                     }
                     true
@@ -222,32 +221,13 @@ Note: Your Bulifier project files are safely stored in our database and won't be
             .show()
     }
 
-    private fun checkout(): AlertDialog? {
-        val binding = PopupCheckoutBinding.inflate(layoutInflater)
-        viewLifecycleOwner.lifecycleScope.launch {
-            val adapter = ArrayAdapter(
-                requireContext(),
-                android.R.layout.simple_dropdown_item_1line,
-                gitViewModel.getBranches()
-            )
-            binding.branchName.setAdapter(adapter)
-        }
-        return AlertDialog.Builder(requireActivity())
-            .setTitle("Checkout Branch")
-            .setView(binding.root)
-            .setPositiveButton("Checkout") { _, _ ->
-                val branchName = binding.branchName.text.toString()
-                if (branchName.isNotEmpty()) {
-                    gitViewModel.checkout(branchName)
-                } else {
-                    showErrorDialog(
-                        requireActivity(),
-                        "Please fill in all fields."
-                    )
-                }
-            }
-            .setNegativeButton("Cancel", null)
-            .show()
+    private fun checkout() {
+        val checkoutDialogManager = CheckoutDialogManager(
+            context = requireContext(),
+            lifecycleOwner = viewLifecycleOwner,
+            gitViewModel = gitViewModel
+        )
+        checkoutDialogManager.showDialog()
     }
 
     private fun clone(): AlertDialog? {

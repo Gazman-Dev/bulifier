@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/dialogCheckoutLayout"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <!-- RadioGroup for selecting between branches and tags -->
+    <RadioGroup
+        android:id="@+id/radioGroup"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/radioBranches"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Branches"
+            android:checked="true" />
+
+        <RadioButton
+            android:id="@+id/radioTags"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Tags" />
+    </RadioGroup>
+
+    <!-- EditText for user input -->
+    <EditText
+        android:id="@+id/editTextBranchTag"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="Enter branch or tag name" />
+
+    <!-- ListView for displaying branches or tags -->
+    <ListView
+        android:id="@+id/listViewItems"
+        android:layout_width="match_parent"
+        android:layout_height="200dp"
+        android:choiceMode="singleChoice" />
+
+</LinearLayout>

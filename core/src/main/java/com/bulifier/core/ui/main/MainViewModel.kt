@@ -14,21 +14,16 @@ import com.bulifier.core.db.File
 import com.bulifier.core.db.FileData
 import com.bulifier.core.db.Project
 import com.bulifier.core.db.db
-import com.bulifier.core.git.GitHelper
-import com.bulifier.core.git.SecureCredentialManager
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.path
 import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
 import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.utils.copyToClipboard
-import deleteAllFilesInFolder
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.eclipse.jgit.transport.CredentialsProvider
 
 data class FullPath(
     val fileName: String?,
@@ -237,7 +232,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 //            MultiFileSharingUtil(app).shareFiles(files)
 //        }
 
-        db.exportProject(app, projectId.flow.value)
+        db.dbToFiles(app, projectId.flow.value)
         Toast.makeText(app, "Project exported", Toast.LENGTH_SHORT).show()
     }
 
