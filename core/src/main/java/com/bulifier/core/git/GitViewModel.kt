@@ -142,6 +142,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
                     reportError("Commit before checking out", "Checkout Error")
                     return@launch
                 }
+                GitHelper.fetch(repoDir, fetchCredentials() ?: return@launch)
                 updateGitInfo("Checking out")
                 GitHelper.checkout(repoDir, branchName, isNew)
                 syncLocalToDb()

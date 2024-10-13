@@ -15,7 +15,7 @@
     <item
         android:id="@+id/push"
         android:icon="@drawable/baseline_cloud_upload_24"
-        android:title="Push &amp; Commit" />
+        android:title="Push" />
     <item
         android:id="@+id/commit"
         android:icon="@drawable/baseline_cloud_upload_24"

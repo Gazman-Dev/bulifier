@@ -93,7 +93,18 @@ data class Project(
     var lastUpdated: Date = Date()
 )
 
-@Entity(tableName = "schemas", indices = [Index(value = ["schema_name"])])
+@Entity(
+    tableName = "schemas", foreignKeys = [ForeignKey(
+        entity = Project::class,
+        parentColumns = arrayOf("project_id"),
+        childColumns = arrayOf("project_id"),
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [
+        Index(value = ["schema_name"]),
+        Index(value = ["project_id"])
+    ]
+)
 @TypeConverters(SetConverter::class)
 data class Schema(
 
@@ -111,10 +122,24 @@ data class Schema(
     val type: SchemaType,
 
     @ColumnInfo(name = "keys")
-    val keys: LinkedHashSet<String>
+    val keys: LinkedHashSet<String>,
+
+    @ColumnInfo(name = "project_id")
+    val projectId: Long,
 )
 
-@Entity(tableName = "schema_settings", indices = [Index(value = ["schema_name"], unique = true)])
+@Entity(
+    tableName = "schema_settings", foreignKeys = [ForeignKey(
+        entity = Project::class,
+        parentColumns = arrayOf("project_id"),
+        childColumns = arrayOf("project_id"),
+        onDelete = ForeignKey.CASCADE
+    )],
+    indices = [
+        Index(value = ["schema_name"], unique = true),
+        Index(value = ["project_id"])
+    ]
+)
 data class SchemaSettings(
 
     @PrimaryKey(autoGenerate = true)
@@ -135,6 +160,9 @@ data class SchemaSettings(
 
     @ColumnInfo(name = "override_files")
     val overrideFiles: Boolean = false,
+
+    @ColumnInfo(name = "project_id")
+    val projectId: Long,
 )
 
 enum class SchemaType {
@@ -166,7 +194,10 @@ enum class SchemaType {
     )],
     indices = [
         Index(value = ["path", "project_id"]),
-        Index(value = ["path", "file_name", "project_id"], unique = true)]
+        Index(
+            value = ["path", "file_name", "project_id"],
+            unique = true
+        ), Index(value = ["project_id"])],
 )
 data class File(
 
@@ -210,8 +241,8 @@ data class Content(
 
     @ColumnInfo(name = "type")
     val type: Type = Type.NONE
-){
-    enum class Type{
+) {
+    enum class Type {
         BULLET,
         RAW,
         SCHEMA,
@@ -227,7 +258,7 @@ data class Content(
         childColumns = arrayOf("project_id"),
         onDelete = ForeignKey.CASCADE
     )],
-    indices = [Index(value = ["last_updated"])]
+    indices = [Index(value = ["last_updated"]), Index(value = ["project_id"])]
 )
 @TypeConverters(DateTypeConverter::class, LongListConverter::class)
 data class HistoryItem(
@@ -264,11 +295,11 @@ data class HistoryItem(
 
     @ColumnInfo(name = "error_message")
     val errorMessage: String? = null,
-){
+) {
     @ColumnInfo(name = "last_updated")
     var lastUpdated: Date = Date()
 
-    companion object{
+    companion object {
         const val SCHEMA_BULLIFY = "bulify"
         const val UPDATE_SCHEMA = "update-schema"
         const val SCHEMA_DEBULIFY = "debulify"
@@ -278,7 +309,7 @@ data class HistoryItem(
 
 @Entity(
     tableName = "responses",
-    indices = [Index(value = ["last_updated"])],
+    indices = [Index(value = ["last_updated"]), Index(value = ["prompt_id"])],
     foreignKeys = [
         ForeignKey(
             entity = HistoryItem::class,
@@ -302,7 +333,7 @@ data class ResponseItem(
 
     @ColumnInfo(name = "request")
     val request: String
-){
+) {
     @ColumnInfo(name = "last_updated")
     var lastUpdated: Date = Date()
 }

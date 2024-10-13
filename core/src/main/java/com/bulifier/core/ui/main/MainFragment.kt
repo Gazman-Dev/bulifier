@@ -226,7 +226,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                 .setNegativeButton("Cancel", null)
                 .create()
 
-            val projectEmpty = viewModel.isProjectEmpty() and viewModel.wasProjectJustUpdated()
+            val projectEmpty = viewModel.isProjectEmpty()
 
             popup.show()
 
@@ -282,7 +282,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             }
 
 
-            val title = if (projectEmpty) {
+            val title = if (projectEmpty && viewModel.wasProjectJustUpdated()) {
                 "Set Up Git Repository"
             } else {
                 "Clone Repository"

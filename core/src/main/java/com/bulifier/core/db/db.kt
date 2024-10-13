@@ -60,28 +60,30 @@ interface SchemaDao {
     @Insert
     suspend fun _addSettings(schema: List<SchemaSettings>)
 
-    @Query("DELETE FROM schemas")
-    suspend fun deleteAllSchemas()
+    @Query("DELETE FROM schemas where project_id = :projectId")
+    suspend fun deleteAllSchemas(projectId: Long)
 
-    @Query("DELETE FROM schema_settings")
-    suspend fun deleteAllSchemasSettings()
+    @Query("DELETE FROM schema_settings where project_id = :projectId")
+    suspend fun deleteAllSchemasSettings(projectId: Long)
 
     @Transaction
     suspend fun addSchemas(schemas: List<Schema>, settings: List<SchemaSettings>) {
-        deleteAllSchemas()
-        deleteAllSchemasSettings()
+        val projectId = schemas.firstOrNull()?.projectId ?: return
+
+        deleteAllSchemas(projectId)
+        deleteAllSchemasSettings(projectId)
         _addSchemas(schemas)
         _addSettings(settings)
     }
 
-    @Query("SELECT * FROM schemas where schema_name = :schemaName order by schema_id")
-    suspend fun getSchema(schemaName: String): List<Schema>
+    @Query("SELECT * FROM schemas where schema_name = :schemaName and project_id = :projectId order by schema_id")
+    suspend fun getSchema(schemaName: String, projectId: Long): List<Schema>
 
-    @Query("SELECT * FROM schema_settings where schema_name = :schemaName")
-    suspend fun getSettings(schemaName: String): SchemaSettings
+    @Query("SELECT * FROM schema_settings where schema_name = :schemaName and project_id = :projectId")
+    suspend fun getSettings(schemaName: String, projectId: Long): SchemaSettings
 
-    @Query("SELECT distinct schema_name FROM schemas order by schema_name")
-    suspend fun getSchemaNames(): Array<String>
+    @Query("SELECT distinct schema_name FROM schemas where project_id = :projectId order by schema_name")
+    suspend fun getSchemaNames(projectId: Long): Array<String>
 }
 
 @Dao
@@ -203,9 +205,6 @@ interface FileDao {
     fun fetchFilesListByProjectId(
         projectId: Long
     ): List<FileData>
-
-    @Query("SELECT * FROM files JOIN contents ON files.file_id = contents.file_id WHERE contents.content LIKE :content")
-    fun searchFilesByContent(content: String): PagingSource<Int, File>
 
     @Query("SELECT * FROM files WHERE file_name LIKE :name")
     fun searchFilesByName(name: String): PagingSource<Int, File>

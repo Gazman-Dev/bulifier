@@ -114,7 +114,7 @@ object SchemaModel {
         withContext(Dispatchers.IO) {
             db.fileDao().loadFilesByPath("schemas", projectId).map {
                 parseSchema(
-                    it.content, it.fileName.substringBeforeLast(".")
+                    it.content, it.fileName.substringBeforeLast("."), projectId
                 )
             }.run {
                 val schemas = flatten()
@@ -128,7 +128,8 @@ object SchemaModel {
                         fileExtension = map["file extension"] ?: "txt",
                         runForEachFile = map["run for each file"] == "true",
                         multiFilesOutput = map["multi files output"] == "true",
-                        overrideFiles = map["override files"] == "true"
+                        overrideFiles = map["override files"] == "true",
+                        projectId = projectId
                     )
                 }
                 db.schemaDao().addSchemas(schemas.filter { it.type != SchemaType.SETTINGS }, settings)
@@ -136,9 +137,9 @@ object SchemaModel {
         }
     }
 
-    suspend fun getSchemaNames() = db.schemaDao().getSchemaNames()
+    suspend fun getSchemaNames() = db.schemaDao().getSchemaNames(projectId = Prefs.projectId.flow.value)
 
-    private fun parseSchema(content: String, schemaName: String): List<Schema> {
+    private fun parseSchema(content: String, schemaName: String, projectId: Long): List<Schema> {
         val pattern = """#(\s*)[0-9a-zA-Z_\-]+""".toRegex()
 
         // Find all matches of the pattern
@@ -177,7 +178,8 @@ object SchemaModel {
                 schemaName = schemaName,
                 content = sections[index],
                 type = type,
-                keys = LinkedHashSet(keys)
+                keys = LinkedHashSet(keys),
+                projectId = projectId
             )
         }.filterNotNull()
     }

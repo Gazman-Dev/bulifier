@@ -32,5 +32,6 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:paddingTop="16dp"
+        android:visibility="gone"
         android:text="I understand that my current project files will be merged with the repository files. In case of conflicts, my project files will override the repository files." />
 </LinearLayout>

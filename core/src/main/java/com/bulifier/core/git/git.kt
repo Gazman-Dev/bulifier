@@ -2,9 +2,12 @@ package com.bulifier.core.git
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import org.eclipse.jgit.api.CreateBranchCommand
 import org.eclipse.jgit.api.Git
+import org.eclipse.jgit.api.ListBranchCommand
 import org.eclipse.jgit.transport.CredentialsProvider
 import java.io.File
+import kotlin.math.min
 
 object GitHelper {
 
@@ -33,21 +36,25 @@ object GitHelper {
     }
 
     suspend fun currentBranch(repoDir: File) = withContext(Dispatchers.IO) {
-        Git.open(repoDir)?.repository?.branch
+        Git.open(repoDir)?.repository?.branch?.run {
+            substring(0, min(10, length))
+        }
     }
 
     suspend fun branches(repoDir: File): List<String> = withContext(Dispatchers.IO) {
-        Git.open(repoDir)
+        val list = Git.open(repoDir)
             ?.branchList()
+            ?.setListMode(ListBranchCommand.ListMode.ALL)
             ?.call()
-            ?.map { it.name.removePrefix("refs/heads/").lowercase() } ?: emptyList()
+            ?.map { it.name.substringAfterLast("/").lowercase() } ?: emptyList()
+        list.toSet().toList() // Remove duplicates
     }
 
     suspend fun tags(repoDir: File): List<String> = withContext(Dispatchers.IO) {
         Git.open(repoDir)
             ?.tagList()
             ?.call()
-            ?.map { it.name.removePrefix("refs/tags/").lowercase() } ?: emptyList()
+            ?.map { it.name.substringAfterLast("/").lowercase() } ?: emptyList()
     }
 
     suspend fun clone(
@@ -77,26 +84,29 @@ object GitHelper {
         withContext(Dispatchers.IO) {
             Git.open(repoDir).use { git ->
                 val repo = git.repository
-                val branchList = branches(repoDir)
-                val tagList = tags(repoDir)
+                val remoteBranchRef = repo.findRef("refs/remotes/origin/$name")
+                val ref = repo.findRef(name)
 
-                if (branchList.contains(name)) {
-                    // It's a branch, check it out
-                    git.checkout()
-                        .setCreateBranch(isNew)
-                        .setName(name)
-                        .call()
-                } else if (tagList.contains(name)) {
-                    // It's a tag, check it out as a detached head
-                    git.checkout()
-                        .setName(repo.findRef("refs/tags/$name").objectId.name)
-                        .call()
-                } else {
-                    // Name doesn't exist, create a new local branch
+                if (isNew) {
                     git.checkout()
                         .setCreateBranch(true)
                         .setName(name)
                         .call()
+                } else if(remoteBranchRef != null){
+                    git.checkout()
+                        .setCreateBranch(true)
+                        .setName(name)
+                        .setUpstreamMode(CreateBranchCommand.SetupUpstreamMode.TRACK)
+                        .setStartPoint("origin/$name")
+                        .call()
+                } else if (ref != null) {
+                    // It's a tag, check it out as a detached head
+                    git.checkout()
+                        .setCreateBranch(true)
+                        .setName(ref.objectId.name)
+                        .call()
+                } else{
+                    throw IllegalArgumentException("Couldn't find branch or tag $name")
                 }
             }
         }
