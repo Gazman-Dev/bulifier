@@ -32,8 +32,8 @@ import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
-import com.bulifier.core.ui.utils.showErrorDialog
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
@@ -130,7 +130,6 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         viewLifecycleOwner.lifecycleScope.launch {
             gitViewModel.gitErrors.collect { gitError ->
                 when (gitError.type) {
-                    "clone" -> showCloneError(gitError)
                     else -> showGeneralError(gitError)
                 }
             }
@@ -170,6 +169,13 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         viewLifecycleOwner.lifecycleScope.launch {
             gitViewModel.gitInfo.collect {
                 binding.bottomBar.info.text = it
+                delay(500) // allow some time to read the message
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            if (viewModel.wasProjectJustUpdated()) {
+                clone()
             }
         }
     }
@@ -180,25 +186,6 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             setMessage(gitError.message)
             setPositiveButton("Ok") { _, _ ->
             }
-            setCancelable(false)
-            show()
-        }
-    }
-
-    private fun showCloneError(gitError: GitError) {
-        AlertDialog.Builder(requireContext()).apply {
-            setTitle("Clone Failed")
-            setMessage(
-                """${gitError.message}
-
-The Git repository couldn't be cloned. You can delete the existing Git folder and retry cloning manually.
-
-Note: Your Bulifier project files are safely stored in our database and won't be impacted by this action. Deleting the Git folder will only affect the repository, not your project data."""
-            )
-            setPositiveButton("Delete Git Folder") { _, _ ->
-                gitViewModel.deleteGit() // This deletes the Git folder
-            }
-            setNegativeButton("Cancel", null)
             setCancelable(false)
             show()
         }
@@ -228,10 +215,62 @@ Note: Your Bulifier project files are safely stored in our database and won't be
         checkoutDialogManager.showDialog()
     }
 
-    private fun clone(): AlertDialog? {
-        val binding = PopupCloneBinding.inflate(layoutInflater)
-
+    private fun clone() {
         viewLifecycleOwner.lifecycleScope.launch {
+            val binding = PopupCloneBinding.inflate(layoutInflater)
+
+            val popup = AlertDialog.Builder(requireActivity())
+                .setTitle("Clone Repository") // Placeholder title
+                .setView(binding.root)
+                .setPositiveButton("Clone", null)
+                .setNegativeButton("Cancel", null)
+                .create()
+
+            val projectEmpty = viewModel.isProjectEmpty() and viewModel.wasProjectJustUpdated()
+
+            popup.show()
+
+            setupAutoCleanErrors(binding, popup, projectEmpty)
+            val cloneButton = popup.getButton(AlertDialog.BUTTON_POSITIVE)
+            cloneButton.setOnClickListener {
+                // Handle "Clone" action here
+                val repoUrl = binding.repoUrl.text.toString()
+                val username = binding.username.text.toString()
+                val passwordToken = binding.passwordToken.text.toString()
+
+                // Check if any field is empty, and if so, mark it with an error
+                var isValid = true
+
+                if (repoUrl.isEmpty()) {
+                    binding.repoUrl.error = "Repository URL is required"
+                    isValid = false
+                } else {
+                    binding.repoUrl.error = null
+                }
+
+                if (username.isEmpty()) {
+                    binding.username.error = "Username is required"
+                    isValid = false
+                } else {
+                    binding.username.error = null
+                }
+
+                if (passwordToken.isEmpty()) {
+                    binding.passwordToken.error = "Password/Token is required"
+                    isValid = false
+                } else {
+                    binding.passwordToken.error = null
+                }
+
+                if (isValid) {
+                    gitViewModel.clone(repoUrl, username, passwordToken)
+                    popup.dismiss()
+                } else {
+                    cloneButton.isEnabled = false
+                }
+            }
+
+            // Retrieve credentials and fill the fields
             gitViewModel.getCredentials().apply {
                 if (this is UsernamePasswordCredentialsProvider) {
                     val password = CredentialItem.Password()
@@ -241,30 +280,61 @@ Note: Your Bulifier project files are safely stored in our database and won't be
                     binding.passwordToken.setText(String(password.value))
                 }
             }
-        }
 
 
-        return AlertDialog.Builder(requireActivity())
-            .setTitle("Clone Repository")
-            .setView(binding.root)
-            .setPositiveButton("Clone") { _, _ ->
-                // Handle "Execute" action here
-                val repoUrl = binding.repoUrl.text.toString()
-                val username = binding.username.text.toString()
-                val passwordToken = binding.passwordToken.text.toString()
-
-                if (repoUrl.isNotEmpty() && username.isNotEmpty() && passwordToken.isNotEmpty()) {
-                    // Trigger cloning process with JGit here
-                    gitViewModel.clone(repoUrl, username, passwordToken)
-                } else {
-                    showErrorDialog(
-                        requireActivity(),
-                        "Please fill in all fields."
-                    )
-                }
+            val title = if (projectEmpty) {
+                "Set Up Git Repository"
+            } else {
+                "Clone Repository"
             }
-            .setNegativeButton("Cancel", null)
-            .show()
+            popup.setTitle(title)
+
+            binding.overwriteProjectFiles.isVisible = !projectEmpty
+            binding.overwriteProjectFiles.setOnCheckedChangeListener { _, _ ->
+                maybeEnableCloneButton(projectEmpty, binding, popup)
+            }
+            maybeEnableCloneButton(projectEmpty, binding, popup)
+        }
+    }
+
+    private fun maybeEnableCloneButton(
+        projectEmpty: Boolean,
+        binding: PopupCloneBinding,
+        popup: AlertDialog
+    ) {
+        val button = popup.getButton(AlertDialog.BUTTON_POSITIVE)
+        button.isEnabled = projectEmpty || binding.overwriteProjectFiles.isChecked
+    }
+
+    private fun setupAutoCleanErrors(
+        binding: PopupCloneBinding,
+        popup: AlertDialog,
+        projectEmpty:Boolean
+    ) {
+        for (editText in listOf(binding.repoUrl, binding.username, binding.passwordToken)) {
+            editText.addTextChangedListener(object : TextWatcher {
+                override fun afterTextChanged(s: Editable?) {
+                    maybeEnableCloneButton(projectEmpty, binding, popup)
+                    editText.error = null
+                }
+
+                override fun beforeTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    count: Int,
+                    after: Int
+                ) {
+                }
+
+                override fun onTextChanged(
+                    s: CharSequence?,
+                    start: Int,
+                    before: Int,
+                    count: Int
+                ) {
+                }
+            })
+        }
     }
 
     private fun registerPath() {

@@ -31,6 +31,14 @@ class DbSyncHelper(
     private suspend fun processDirectory(currentDir: File, parentPath: String, projectId: Long) {
         if (!currentDir.exists()) return
 
+        val schemasRoot = DbFile(
+            projectId = projectId,
+            path = "",
+            fileName = "schemas",
+            isFile = false
+        )
+        db.fileDao().insertFile(schemasRoot)
+
         currentDir.listFiles()?.forEach { file ->
             val fileName = file.name
             val isFile = file.isFile
@@ -67,11 +75,11 @@ class DbSyncHelper(
     }
 
 
-    suspend fun exportProject(projectId: Long) {
+    suspend fun exportProject(projectId: Long, clearOldFiles: Boolean) {
         // Fetch the project name from the database or pass it as a parameter
         val projectName = db.fileDao().getProjectById(projectId).projectName
-        val srcDir = context.filesDir.createOverrideEmptyDirectory("$projectName/src")
-        val schemasDir = context.filesDir.createOverrideEmptyDirectory("$projectName/schemas")
+        val srcDir = context.filesDir.createOverrideEmptyDirectory("$projectName/src", clearOldFiles)
+        val schemasDir = context.filesDir.createOverrideEmptyDirectory("$projectName/schemas", clearOldFiles)
 
         db.fileDao().exportFilesAndContents(projectId).forEach { fileData ->
             val baseDir: File
@@ -119,10 +127,12 @@ class DbSyncHelper(
         }
     }
 
-    private fun File.createOverrideEmptyDirectory(folderName: String) =
+    private fun File.createOverrideEmptyDirectory(folderName: String, clearOldFiles: Boolean) =
         File(this, folderName).apply {
             mkdirs()
-            deleteAllFilesInFolder(this)
+            if(clearOldFiles) {
+                deleteAllFilesInFolder(this)
+            }
         }
 }
 

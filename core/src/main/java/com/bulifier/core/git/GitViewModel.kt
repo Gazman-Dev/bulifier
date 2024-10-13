@@ -6,8 +6,10 @@ import androidx.lifecycle.viewModelScope
 import com.bulifier.core.db.db
 import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
+import com.bulifier.core.schemas.SchemaModel
 import deleteAllFilesInFolder
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -52,13 +54,11 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     fun pull() {
         viewModelScope.launch {
             try {
-                updateGitInfo("Syncing Local Storage")
-                db.dbToFiles(app, projectId.flow.value)
+                syncDbToLocal()
                 val creds = fetchCredentials() ?: return@launch
                 updateGitInfo("Pulling")
                 GitHelper.pull(repoDir, creds)
-                updateGitInfo("Syncing DB")
-                db.filesToDb(app, projectId.flow.value)
+                syncLocalToDb()
                 markGitInfoSuccess()
             } catch (e: Exception) {
                 reportError(e, "Pull")
@@ -69,9 +69,9 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     fun push() {
         viewModelScope.launch {
             try {
-                db.dbToFiles(app, projectId.flow.value)
-                if(!GitHelper.isClean(repoDir)){
-                    sendError("Commit before pushing", "Push Error")
+                syncDbToLocal()
+                if (!GitHelper.isClean(repoDir)) {
+                    reportError("Commit before pushing", "Push Error")
                     return@launch
                 }
                 updateGitInfo("Pushing")
@@ -84,7 +84,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private suspend fun sendError(message: String, title: String) {
+    private suspend fun reportError(message: String, title: String) {
         gitErrors as MutableSharedFlow
         gitErrors.emit(GitError(message, title, "error"))
         resetGitInfo()
@@ -97,9 +97,12 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
             val creds = fetchCredentials() ?: return@launch
 
             try {
+                deleteAllFilesInFolder(repoDir)
                 GitHelper.clone(repoDir, creds, repoUrl)
-                updateGitInfo("Syncing DB")
-                db.filesToDb(app, projectId.flow.value)
+                syncDbToLocal(false) // override repo with project files
+                syncLocalToDb() // load all the files into the db
+                updateGitInfo("Reloading schemas")
+                SchemaModel.reloadSchemas(projectId.flow.value)
                 markGitInfoSuccess()
             } catch (e: Exception) {
                 reportError(e, "Clone")
@@ -112,21 +115,18 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         gitInfo.value = message
     }
 
-    suspend fun fetch(){
+    suspend fun fetch() {
         updateGitInfo("Fetching")
         GitHelper.fetch(repoDir, fetchCredentials() ?: return)
         resetGitInfo()
     }
 
-    fun commit(commitMessage: String){
+    fun commit(commitMessage: String) {
         viewModelScope.launch {
             try {
-                updateGitInfo("Syncing local storage")
-                db.dbToFiles(app, projectId.flow.value)
+                syncDbToLocal()
                 updateGitInfo("Committing")
-                withContext(Dispatchers.IO) {
-                    GitHelper.commit(repoDir, commitMessage)
-                }
+                GitHelper.commit(repoDir, commitMessage)
                 markGitInfoSuccess()
             } catch (e: Exception) {
                 reportError(e, "Commit")
@@ -134,24 +134,32 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun checkout(branchName: String, isNew:Boolean) {
+    fun checkout(branchName: String, isNew: Boolean) {
         viewModelScope.launch {
             try {
-                updateGitInfo("Syncing local storage")
-                db.dbToFiles(app, projectId.flow.value)
-                if(!GitHelper.isClean(repoDir)){
-                    sendError("Commit before checking out", "Checkout Error")
+                syncDbToLocal()
+                if (!GitHelper.isClean(repoDir)) {
+                    reportError("Commit before checking out", "Checkout Error")
                     return@launch
                 }
                 updateGitInfo("Checking out")
                 GitHelper.checkout(repoDir, branchName, isNew)
-                updateGitInfo("Syncing DB")
-                db.filesToDb(app, projectId.flow.value)
+                syncLocalToDb()
                 markGitInfoSuccess()
             } catch (e: Exception) {
                 reportError(e, "Checkout")
             }
         }
+    }
+
+    private suspend fun syncDbToLocal(clearOldFiles: Boolean = true) {
+        updateGitInfo("Syncing db to local storage")
+        db.dbToLocal(app, projectId.flow.value, clearOldFiles)
+    }
+
+    private suspend fun syncLocalToDb() {
+        updateGitInfo("Syncing local storage to db")
+        db.localToDb(app, projectId.flow.value)
     }
 
     private suspend fun reportError(
@@ -198,16 +206,14 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         emptyList()
     }
 
-    fun deleteGit() {
+    suspend fun getCredentials() = credentials.retrieveCredentials(projectId.flow.value)
+    fun deleteProject(projectName: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                deleteAllFilesInFolder(repoDir)
-                resetGitInfo()
+                java.io.File(app.filesDir, projectName).deleteRecursively()
             }
         }
     }
-
-    suspend fun getCredentials() = credentials.retrieveCredentials(projectId.flow.value)
 }
 
 data class GitError(

@@ -111,15 +111,17 @@ object GitHelper {
         return !repoDir.exists() || !File(repoDir, ".git").exists()
     }
 
-    fun commit(repoDir: File, commitMessage: String) {
-        Git.open(repoDir).use { git ->
-            git.add()
-                .addFilepattern(".")
-                .setUpdate(true) // include deleted files
-                .call()
-            git.commit()
-                .setMessage(commitMessage)
-                .call()
+    suspend fun commit(repoDir: File, commitMessage: String) {
+        withContext(Dispatchers.IO) {
+            Git.open(repoDir).use { git ->
+                git.add()
+                    .addFilepattern(".")
+                    .setUpdate(true) // include deleted files
+                    .call()
+                git.commit()
+                    .setMessage(commitMessage)
+                    .call()
+            }
         }
     }
 

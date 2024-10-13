@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Date
 
 data class FullPath(
     val fileName: String?,
@@ -225,17 +226,6 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun shareFiles() = viewModelScope.launch {
-//        withContext(Dispatchers.IO) {
-//            val projectId = projectId.flow.value
-//            val files = db.fetchFilesListByProjectId(projectId)
-//            MultiFileSharingUtil(app).shareFiles(files)
-//        }
-
-        db.dbToFiles(app, projectId.flow.value)
-        Toast.makeText(app, "Project exported", Toast.LENGTH_SHORT).show()
-    }
-
     fun deleteProject(project: Project) = viewModelScope.launch {
         db.deleteProject(project)
     }
@@ -284,7 +274,11 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-
+    suspend fun isProjectEmpty() = db.isProjectEmpty(projectId.flow.value)
+    suspend fun wasProjectJustUpdated(): Boolean {
+        val lastUpdated = db.getProject(projectId.flow.value)
+        return (Date().time - lastUpdated.lastUpdated.time) < 5000
+    }
 
 
 }

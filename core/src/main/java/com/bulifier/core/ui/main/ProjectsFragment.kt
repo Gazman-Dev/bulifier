@@ -12,6 +12,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreProjectsFragmentBinding
 import com.bulifier.core.db.Project
+import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.ui.core.BaseFragment
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -20,6 +21,7 @@ import kotlinx.coroutines.launch
 class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
 
     private val mainViewModel by activityViewModels<MainViewModel>()
+    private val gitViewModel by activityViewModels<GitViewModel>()
 
     override fun createBinding(
         inflater: LayoutInflater,
@@ -43,7 +45,7 @@ class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
     }
 
     private fun setupProjectsList() {
-        val projectsAdapter = ProjectsAdapter(mainViewModel) {
+        val projectsAdapter = ProjectsAdapter(mainViewModel, gitViewModel) {
             viewLifecycleOwner.lifecycleScope.launch {
                 mainViewModel.selectProject(it)
                 findNavController().navigate(R.id.mainFragment)

@@ -5,12 +5,6 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingBottom="8dp"
-        android:text="Cloning will save the repository to your local storage. To work with these files in your project, you'll need to explicitly call 'Load Project' to load the project from local storage." />
-
     <EditText
         android:id="@+id/repo_url"
         android:layout_width="match_parent"
@@ -31,4 +25,12 @@
         android:layout_height="wrap_content"
         android:hint="Password / Private Token"
         android:inputType="textPassword" />
+
+    <!-- Updated CheckBox for Scenario 2 -->
+    <CheckBox
+        android:id="@+id/overwrite_project_files"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="16dp"
+        android:text="I understand that my current project files will be merged with the repository files. In case of conflicts, my project files will override the repository files." />
 </LinearLayout>

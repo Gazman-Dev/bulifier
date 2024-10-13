@@ -152,11 +152,15 @@ interface HistoryDao {
 interface FileDao {
 
     @Transaction
-    suspend fun dbToFiles(context: Context, projectId: Long) =
-        DbSyncHelper(context).exportProject(projectId)
+    suspend fun dbToLocal(
+        context: Context,
+        projectId: Long,
+        clearOldFiles: Boolean
+    ) =
+        DbSyncHelper(context).exportProject(projectId, clearOldFiles)
 
     @Transaction
-    suspend fun filesToDb(context: Context, projectId: Long) =
+    suspend fun localToDb(context: Context, projectId: Long) =
         DbSyncHelper(context).importProject(projectId)
 
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
@@ -344,16 +348,8 @@ interface FileDao {
 
     @Transaction
     suspend fun deleteProject(project: Project) {
-        _deleteFilesByProjectId(project.projectId)
-        _deleteHistoryProjectId(project.projectId)
         _deleteProject(project)
     }
-
-    @Query("DELETE FROM files WHERE project_id = :projectId")
-    suspend fun _deleteFilesByProjectId(projectId: Long)
-
-    @Query("DELETE FROM history WHERE project_id = :projectId")
-    suspend fun _deleteHistoryProjectId(projectId: Long)
 
     @Delete
     suspend fun _deleteProject(project: Project)
@@ -485,6 +481,18 @@ interface FileDao {
 
     @Query("DELETE FROM files WHERE project_id = :projectId")
     suspend fun deleteFilesByProjectId(projectId: Long)
+
+    @Query(
+        """SELECT count(*) == 0 FROM files 
+        WHERE project_id = :projectId and 
+            path != 'schemas' and
+            (file_name != 'schemas' or path != '')
+            """
+    )
+    suspend fun isProjectEmpty(projectId: Long): Boolean
+
+    @Query("SELECT * FROM projects WHERE project_id = :projectId")
+    suspend fun getProject(projectId: Long): Project
 }
 
 data class FileData(

@@ -1,6 +1,5 @@
 package com.bulifier.core.db
 
-import android.content.Context
 import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.Entity
@@ -222,6 +221,12 @@ data class Content(
 
 @Entity(
     tableName = "history",
+    foreignKeys = [ForeignKey(
+        entity = Project::class,
+        parentColumns = arrayOf("project_id"),
+        childColumns = arrayOf("project_id"),
+        onDelete = ForeignKey.CASCADE
+    )],
     indices = [Index(value = ["last_updated"])]
 )
 @TypeConverters(DateTypeConverter::class, LongListConverter::class)
