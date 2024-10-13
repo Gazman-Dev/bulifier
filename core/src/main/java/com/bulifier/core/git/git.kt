@@ -85,11 +85,16 @@ object GitHelper {
             Git.open(repoDir).use { git ->
                 val repo = git.repository
                 val remoteBranchRef = repo.findRef("refs/remotes/origin/$name")
+                val localBranchRef = repo.findRef("refs/heads/$name")
                 val ref = repo.findRef(name)
 
                 if (isNew) {
                     git.checkout()
                         .setCreateBranch(true)
+                        .setName(name)
+                        .call()
+                } else if (localBranchRef != null) {
+                    git.checkout()
                         .setName(name)
                         .call()
                 } else if(remoteBranchRef != null){
@@ -102,7 +107,6 @@ object GitHelper {
                 } else if (ref != null) {
                     // It's a tag, check it out as a detached head
                     git.checkout()
-                        .setCreateBranch(true)
                         .setName(ref.objectId.name)
                         .call()
                 } else{
@@ -128,6 +132,12 @@ object GitHelper {
                     .addFilepattern(".")
                     .setUpdate(true) // include deleted files
                     .call()
+
+                git.add()
+                    .addFilepattern(".")
+                    .setUpdate(false) // include new files
+                    .call()
+
                 git.commit()
                     .setMessage(commitMessage)
                     .call()
