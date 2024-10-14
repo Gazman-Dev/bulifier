@@ -14,6 +14,12 @@ object Prefs {
     val path by lazy { PrefStringValue("path_v1") }
     val models by lazy { PrefListValue("models") }
 
+    fun clear(){
+        projectId.set(-1)
+        projectName.set("")
+        path.set("")
+    }
+
     fun initialize(context: Context) {
         pref = context.getSharedPreferences("buly", 0)
     }

@@ -20,4 +20,9 @@
         android:id="@+id/commit"
         android:icon="@drawable/baseline_cloud_upload_24"
         android:title="Commit" />
+
+    <item
+        android:id="@+id/clear"
+        android:icon="@drawable/baseline_delete_forever_24"
+        android:title="Hard Reset &amp; Clean" />
 </menu>

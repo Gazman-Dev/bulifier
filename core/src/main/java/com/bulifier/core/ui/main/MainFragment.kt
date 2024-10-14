@@ -108,6 +108,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                         R.id.pull -> gitViewModel.pull()
                         R.id.push -> gitViewModel.push()
                         R.id.commit -> commit()
+                        R.id.clear -> clear()
                         else -> Unit
                     }
                     true
@@ -177,6 +178,18 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             if (viewModel.wasProjectJustUpdated()) {
                 clone()
             }
+        }
+    }
+
+    private fun clear() {
+        AlertDialog.Builder(requireContext()).apply {
+            setTitle("Hard Reset & Clean")
+            setMessage("Remove all uncommited changed")
+            setPositiveButton("Clean") { _, _ ->
+                gitViewModel.clean()
+            }
+            setCancelable(false)
+            show()
         }
     }
 

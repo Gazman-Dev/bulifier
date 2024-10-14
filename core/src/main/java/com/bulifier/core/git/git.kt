@@ -5,6 +5,7 @@ import kotlinx.coroutines.withContext
 import org.eclipse.jgit.api.CreateBranchCommand
 import org.eclipse.jgit.api.Git
 import org.eclipse.jgit.api.ListBranchCommand
+import org.eclipse.jgit.api.ResetCommand
 import org.eclipse.jgit.transport.CredentialsProvider
 import java.io.File
 import kotlin.math.min
@@ -149,6 +150,21 @@ object GitHelper {
         Git.open(repoDir).use { git ->
             val status = git.status().call()
             return status.isClean
+        }
+    }
+
+    suspend fun clean(repoDir: File) {
+        withContext(Dispatchers.IO) {
+            Git.open(repoDir).use { git ->
+                git.reset()
+                    .setMode(ResetCommand.ResetType.HARD)
+                    .call()
+
+                git.clean()
+                    .setCleanDirectories(true)  // Removes untracked directories
+                    .setIgnore(false)  // Removes ignored files as well
+                    .call()
+            }
         }
     }
 

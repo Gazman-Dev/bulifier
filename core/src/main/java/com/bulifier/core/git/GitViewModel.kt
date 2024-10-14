@@ -9,7 +9,6 @@ import com.bulifier.core.prefs.Prefs.projectName
 import com.bulifier.core.schemas.SchemaModel
 import deleteAllFilesInFolder
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -213,6 +212,16 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
             withContext(Dispatchers.IO) {
                 java.io.File(app.filesDir, projectName).deleteRecursively()
             }
+        }
+    }
+
+    fun clean() {
+        viewModelScope.launch {
+            updateGitInfo("Cleaning")
+            GitHelper.clean(repoDir)
+            syncLocalToDb()
+            markGitInfoSuccess()
+
         }
     }
 }
