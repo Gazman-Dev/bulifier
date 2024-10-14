@@ -12,16 +12,15 @@
       - *Expected*: The path should display as `"com/game/snake"` with no folders on the screen.
       - *Actual*: The correct path is shown, but the `"com"` folder appears on the screen.
 
-- **Database Indexing**:
-   - `project_id` is not indexed properly in all tables; it should be referenced as a foreign key and indexed.
-
 - **Orientation Change**:
    - When changing orientation while viewing a file, the file content disappears.
 
 # Solved
 - **Jobs Scheduler Screen**:
-    - Clicking the "New" button on the Jobs Scheduler screen:
-        - *Expected*: Opens the job detail screen.
-        - *Actual*: Stays on the same screen and only adds the new job to the list.
-        - *Note*: I might have fixed it, but it is delicate. This mechanism needs to be better synchronized  
+   - Clicking the "New" button on the Jobs Scheduler screen:
+      - *Expected*: Opens the job detail screen.
+      - *Actual*: Stays on the same screen and only adds the new job to the list.
+      - *Note*: I might have fixed it, but it is delicate. This mechanism needs to be better synchronized  
+   - **Database Indexing**:
+      - `project_id` is not indexed properly in all tables; it should be referenced as a foreign key and indexed.
 
