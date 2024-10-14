@@ -17,6 +17,7 @@ import android.widget.TextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
+import androidx.core.view.forEach
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -100,6 +101,12 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         binding.bottomBar.gitButton.setOnClickListener {
             PopupMenu(requireContext(), binding.bottomBar.gitButton).apply {
                 inflate(R.menu.git_menu)
+
+                val isCloneNeeded = gitViewModel.isCloneNeeded()
+                menu.forEach {
+                    it.isEnabled = !isCloneNeeded || it.itemId == R.id.clone
+                }
+
                 setForceShowIcon(true)
                 setOnMenuItemClickListener {
                     when (it.itemId) {
@@ -322,7 +329,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
     private fun setupAutoCleanErrors(
         binding: PopupCloneBinding,
         popup: AlertDialog,
-        projectEmpty:Boolean
+        projectEmpty: Boolean
     ) {
         for (editText in listOf(binding.repoUrl, binding.username, binding.passwordToken)) {
             editText.addTextChangedListener(object : TextWatcher {
