@@ -224,6 +224,8 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
 
         }
     }
+
+    fun isCloneNeeded() = GitHelper.isCloneNeeded(repoDir)
 }
 
 data class GitError(

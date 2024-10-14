@@ -24,6 +24,7 @@ import com.bulifier.core.models.questions.OpenAiQuestionsModel
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.ui.ai.AiHistoryFragmentDirections
 import com.bulifier.core.ui.ai.HistoryViewModel
+import com.bulifier.core.ui.utils.hideKeyboard
 import com.bulifier.core.ui.utils.showQuestionsDialog
 import kotlinx.coroutines.launch
 
@@ -52,15 +53,18 @@ class SelectedHistoryViewHolder(
 
                 else -> {
                     viewModel.discard()
+                    binding.root.hideKeyboard()
                 }
             }
         }
         binding.prompt.draftButton.setOnClickListener {
             viewModel.saveToDraft()
+            binding.root.hideKeyboard()
         }
 
         binding.prompt.sendButton.setOnClickListener {
             viewModel.send(binding.prompt.chatBox.text.toString(), binding.prompt.schemaSpinner.selectedItem.toString())
+            binding.root.hideKeyboard()
         }
 
         binding.prompt.chatBox.addTextChangedListener {
@@ -232,6 +236,7 @@ class SelectedHistoryViewHolder(
 
     override fun onToolbarClick(historyItem: HistoryItem?) {
         viewModel.saveToDraft()
+        binding.root.hideKeyboard()
     }
 
 }

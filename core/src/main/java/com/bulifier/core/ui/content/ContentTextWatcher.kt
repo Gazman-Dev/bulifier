@@ -1,12 +1,15 @@
 package com.bulifier.core.ui.content
 
+import android.content.Context
 import android.text.TextWatcher
 import android.util.Log
+import android.view.View
+import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
-import androidx.core.view.isVisible
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.bulifier.core.ui.main.MainViewModel
+import com.bulifier.core.ui.utils.hideKeyboard
 
 class ContentTextWatcher(
     private val textBox:EditText,
@@ -62,21 +65,18 @@ class ContentTextWatcher(
         } else {
             Log.d("FileContentFragment", "UI: watcher removed")
             textBox.removeTextChangedListener(watcher)
+            textBox.hideKeyboard()
         }
     }
 
-    fun start(text: String) {
+    fun start() {
         startRequested = true
-        textBox.isVisible = true
-        update(text)
         verifyWatcher()
     }
 
     fun stop(){
         startRequested = false
         textBox.removeTextChangedListener(watcher)
-        textBox.isVisible = false
-        systemText = ""
         verifyWatcher()
     }
 
@@ -90,10 +90,8 @@ class ContentTextWatcher(
     }
 
     fun update(text: String) {
-        if(startRequested){
-            ticker.reset()
-            systemText = text
-            textBox.setText(text)
-        }
+        ticker.reset()
+        systemText = text
+        textBox.setText(text)
     }
 }

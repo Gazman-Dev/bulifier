@@ -492,6 +492,12 @@ interface FileDao {
 
     @Query("SELECT * FROM projects WHERE project_id = :projectId")
     suspend fun getProject(projectId: Long): Project
+
+    @Query("SELECT * FROM projects WHERE project_name = :projectName")
+    suspend fun getProject(projectName: String): Project?
+
+    @Query("SELECT count(*) > 0 FROM projects WHERE project_name = :projectName")
+    suspend fun isProjectExists(projectName: String): Boolean
 }
 
 data class FileData(
