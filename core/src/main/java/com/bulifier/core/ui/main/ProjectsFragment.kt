@@ -1,6 +1,8 @@
 package com.bulifier.core.ui.main
 
 import android.os.Bundle
+import android.text.Editable
+import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -11,12 +13,11 @@ import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
 import com.bulifier.core.databinding.CoreProjectsFragmentBinding
-import com.bulifier.core.db.Project
 import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.ui.core.BaseFragment
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
-
 
 class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
 
@@ -28,19 +29,51 @@ class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
         container: ViewGroup?
     ) = CoreProjectsFragmentBinding.inflate(inflater, container, false)
 
-
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
         binding.createButton.setOnClickListener {
-            createProject(binding.textBox.text.toString())
+            createOrOpenProject(binding.textBox.text.toString())
         }
+
         binding.textBox.setOnEditorActionListener { textBox, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
-                createProject(textBox.text.toString())
+                createOrOpenProject(textBox.text.toString())
                 true
             } else {
                 false
             }
         }
+
+        binding.textBox.addTextChangedListener(object : TextWatcher {
+            private var job: Job? = null
+
+            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
+                // Do nothing
+            }
+
+            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                job?.cancel()
+                val projectName = s.toString()
+                if (projectName.isBlank()) {
+                    binding.createButton.text = "Create"
+                    return
+                }
+                job = viewLifecycleOwner.lifecycleScope.launch {
+                    val exists = mainViewModel.isProjectExists(projectName)
+                    if (exists) {
+                        binding.createButton.text = "Open"
+                    } else {
+                        binding.createButton.text = "Create"
+                    }
+                }
+            }
+
+            override fun afterTextChanged(s: Editable?) {
+                binding.textBox.error = null
+            }
+        })
+
         setupProjectsList()
     }
 
@@ -60,11 +93,14 @@ class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
         }
     }
 
-    private fun createProject(projectName: String) {
+    private fun createOrOpenProject(projectName: String) {
+        if (projectName.isBlank()) {
+            binding.textBox.error = "Project name cannot be empty"
+            return
+        }
         lifecycleScope.launch {
-            mainViewModel.createProject(projectName)
+            mainViewModel.createOrSelectProject(projectName)
             findNavController().navigate(R.id.mainFragment)
         }
     }
-
 }

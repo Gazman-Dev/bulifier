@@ -79,7 +79,11 @@ class SetConverter {
     }
 }
 
-@Entity(tableName = "projects", indices = [Index(value = ["project_id"], unique = true)])
+@Entity(tableName = "projects", indices =
+[
+    Index(value = ["project_id"], unique = true),
+    Index(value = ["project_name"], unique = true)
+])
 @TypeConverters(DateTypeConverter::class)
 data class Project(
     @PrimaryKey(autoGenerate = true)

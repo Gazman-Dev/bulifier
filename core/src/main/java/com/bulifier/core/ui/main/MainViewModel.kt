@@ -157,7 +157,12 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    suspend fun createProject(projectName: String) {
+    suspend fun createOrSelectProject(projectName: String) {
+        val existingProject = db.getProject(projectName)
+        if(existingProject != null){
+            selectProject(existingProject)
+            return
+        }
         val projectId = db.insertProject(Project(projectName = projectName))
         withContext(Dispatchers.Main) {
             Prefs.projectId.set(projectId)
@@ -276,9 +281,14 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     suspend fun isProjectEmpty() = db.isProjectEmpty(projectId.flow.value)
     suspend fun wasProjectJustUpdated(): Boolean {
+        if(projectId.flow.value == -1L){
+            return false
+        }
         val lastUpdated = db.getProject(projectId.flow.value)
         return (Date().time - lastUpdated.lastUpdated.time) < 5000
     }
+
+    suspend fun isProjectExists(projectName: String) = db.isProjectExists(projectName)
 
 
 }

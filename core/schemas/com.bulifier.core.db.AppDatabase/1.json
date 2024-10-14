@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "2879ac4852f3e769e231b0518c385896",
+    "identityHash": "0ec76bf5e3f4eb1dc43a440cf11bafe7",
     "entities": [
       {
         "tableName": "projects",
@@ -42,6 +42,15 @@
             ],
             "orders": [],
             "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_projects_project_id` ON `${TABLE_NAME}` (`project_id`)"
+          },
+          {
+            "name": "index_projects_project_name",
+            "unique": true,
+            "columnNames": [
+              "project_name"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_projects_project_name` ON `${TABLE_NAME}` (`project_name`)"
           }
         ],
         "foreignKeys": []
@@ -557,7 +566,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '2879ac4852f3e769e231b0518c385896')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0ec76bf5e3f4eb1dc43a440cf11bafe7')"
     ]
   }
 }
