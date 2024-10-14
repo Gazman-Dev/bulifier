@@ -10,9 +10,13 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven {
+            url "https://repo.eclipse.org/content/groups/releases/"
+        }
     }
 }
 
 rootProject.name = "Bulifier"
 include ':core'
 include ':demo'
+include ':jgit'

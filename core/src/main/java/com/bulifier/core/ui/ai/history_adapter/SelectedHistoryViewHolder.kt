@@ -113,7 +113,7 @@ class SelectedHistoryViewHolder(
             }
             if (Prefs.models.flow.value.isEmpty()) {
                 adapter.add(addModelKey)
-                binding.prompt.modelSpinner.setOnTouchListener { v, event ->
+                binding.prompt.modelSpinner.setOnTouchListener { _, event ->
                     if (event.action == MotionEvent.ACTION_UP && adapter.count == 1) {
                         viewLifecycleOwner.lifecycleScope.launch {
                             createModel()

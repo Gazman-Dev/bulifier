@@ -2,6 +2,7 @@
 
 package com.bulifier.core.db
 
+import DbSyncHelper
 import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
@@ -59,31 +60,30 @@ interface SchemaDao {
     @Insert
     suspend fun _addSettings(schema: List<SchemaSettings>)
 
-    @Query("DELETE FROM schemas")
-    suspend fun deleteAllSchemas()
+    @Query("DELETE FROM schemas where project_id = :projectId")
+    suspend fun deleteAllSchemas(projectId: Long)
 
-    @Query("DELETE FROM schema_settings")
-    suspend fun deleteAllSchemasSettings()
+    @Query("DELETE FROM schema_settings where project_id = :projectId")
+    suspend fun deleteAllSchemasSettings(projectId: Long)
 
     @Transaction
     suspend fun addSchemas(schemas: List<Schema>, settings: List<SchemaSettings>) {
-        deleteAllSchemas()
-        deleteAllSchemasSettings()
+        val projectId = schemas.firstOrNull()?.projectId ?: return
+
+        deleteAllSchemas(projectId)
+        deleteAllSchemasSettings(projectId)
         _addSchemas(schemas)
         _addSettings(settings)
     }
 
-    @Query("SELECT * FROM schemas where schema_name = :schemaName order by schema_id")
-    suspend fun getSchema(schemaName: String): List<Schema>
+    @Query("SELECT * FROM schemas where schema_name = :schemaName and project_id = :projectId order by schema_id")
+    suspend fun getSchema(schemaName: String, projectId: Long): List<Schema>
 
-    @Query("SELECT * FROM schema_settings where schema_name = :schemaName")
-    suspend fun getSettings(schemaName: String): SchemaSettings
+    @Query("SELECT * FROM schema_settings where schema_name = :schemaName and project_id = :projectId")
+    suspend fun getSettings(schemaName: String, projectId: Long): SchemaSettings
 
-    data class SchemaData(val schemas:List<Schema>, val settings:SchemaSettings)
-
-    @Query("SELECT distinct schema_name FROM schemas order by schema_name")
-    suspend fun getSchemaNames(): Array<String>
-
+    @Query("SELECT distinct schema_name FROM schemas where project_id = :projectId order by schema_name")
+    suspend fun getSchemaNames(projectId: Long): Array<String>
 }
 
 @Dao
@@ -153,6 +153,18 @@ interface HistoryDao {
 @Dao
 interface FileDao {
 
+    @Transaction
+    suspend fun dbToLocal(
+        context: Context,
+        projectId: Long,
+        clearOldFiles: Boolean
+    ) =
+        DbSyncHelper(context).exportProject(projectId, clearOldFiles)
+
+    @Transaction
+    suspend fun localToDb(context: Context, projectId: Long) =
+        DbSyncHelper(context).importProject(projectId)
+
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
 
@@ -169,6 +181,7 @@ interface FileDao {
         """SELECT 
             files.file_name, 
             files.path, 
+            files.is_file,
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
@@ -183,6 +196,7 @@ interface FileDao {
         """SELECT 
             files.file_name, 
             files.path, 
+            files.is_file,
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
@@ -191,9 +205,6 @@ interface FileDao {
     fun fetchFilesListByProjectId(
         projectId: Long
     ): List<FileData>
-
-    @Query("SELECT * FROM files JOIN contents ON files.file_id = contents.file_id WHERE contents.content LIKE :content")
-    fun searchFilesByContent(content: String): PagingSource<Int, File>
 
     @Query("SELECT * FROM files WHERE file_name LIKE :name")
     fun searchFilesByName(name: String): PagingSource<Int, File>
@@ -258,6 +269,7 @@ interface FileDao {
         """SELECT 
             files.file_name, 
             files.path, 
+            files.is_file,
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
@@ -269,7 +281,8 @@ interface FileDao {
     @Query(
         """SELECT 
             files.file_name, 
-            files.path, 
+            files.path,
+            files.is_file,
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
@@ -291,6 +304,7 @@ interface FileDao {
         """SELECT 
             files.file_name, 
             files.path, 
+            files.is_file,
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
@@ -298,15 +312,6 @@ interface FileDao {
         """
     )
     suspend fun getContent(path: String, fileName: String, projectId: Long): FileData?
-
-    @Query(
-        """SELECT 
-            files.path || '/' || files.file_name 
-        FROM files
-        WHERE (files.path || '/' || files.file_name) in (:fullFileName) and files.project_id = :projectId
-        """
-    )
-    suspend fun getFilesInList(fullFileName:List<String>, projectId: Long): List<String>
 
     @Query(
         """SELECT
@@ -331,6 +336,7 @@ interface FileDao {
         """SELECT 
             files.file_name, 
             files.path, 
+            files.is_file,
             contents.* 
         FROM contents 
             join files on contents.file_id = files.file_id
@@ -341,16 +347,8 @@ interface FileDao {
 
     @Transaction
     suspend fun deleteProject(project: Project) {
-        _deleteFilesByProjectId(project.projectId)
-        _deleteHistoryProjectId(project.projectId)
         _deleteProject(project)
     }
-
-    @Query("DELETE FROM files WHERE project_id = :projectId")
-    suspend fun _deleteFilesByProjectId(projectId: Long)
-
-    @Query("DELETE FROM history WHERE project_id = :projectId")
-    suspend fun _deleteHistoryProjectId(projectId: Long)
 
     @Delete
     suspend fun _deleteProject(project: Project)
@@ -461,12 +459,47 @@ interface FileDao {
     )
 
     @Query("SELECT count(*) > 0 FROM files WHERE path = :path AND project_id = :projectId")
-    suspend fun isPathExists(path:String, projectId:Long) : Boolean
+    suspend fun isPathExists(path: String, projectId: Long): Boolean
+
+    @Query("SELECT * FROM projects WHERE project_id = :projectId")
+    fun getProjectById(projectId: Long): Project
+
+    @Query("SELECT * FROM files WHERE project_id = :projectId")
+    fun getFilesByProjectId(projectId: Long): List<File>
+
+    @Query(
+        """
+        SELECT files.file_id, files.file_name, files.path, files.is_file, contents.content, contents.type
+        FROM files
+        JOIN contents ON files.file_id = contents.file_id
+        WHERE files.project_id = :projectId
+        ORDER BY files.file_id ASC
+    """
+    )
+    suspend fun exportFilesAndContents(projectId: Long): List<FileData>
+
+    @Query("DELETE FROM files WHERE project_id = :projectId")
+    suspend fun deleteFilesByProjectId(projectId: Long)
+
+    @Query(
+        """SELECT count(*) == 0 FROM files 
+        WHERE project_id = :projectId and 
+            path != 'schemas' and
+            (file_name != 'schemas' or path != '')
+            """
+    )
+    suspend fun isProjectEmpty(projectId: Long): Boolean
+
+    @Query("SELECT * FROM projects WHERE project_id = :projectId")
+    suspend fun getProject(projectId: Long): Project
 }
 
 data class FileData(
     @ColumnInfo(name = "file_name")
     val fileName: String,
+
+    @ColumnInfo(name = "is_file")
+    val isFile: Boolean,
 
     @ColumnInfo(name = "path")
     val path: String,

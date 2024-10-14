@@ -15,9 +15,8 @@ import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
 import com.bulifier.core.models.QuestionsModel
 import com.bulifier.core.prefs.Prefs
-import com.bulifier.core.schemas.SchemaModel
-import com.bulifier.core.schemas.SchemaModel.KEY_MAIN_FILE
 import com.bulifier.core.schemas.SchemaModel.KEY_CONTEXT
+import com.bulifier.core.schemas.SchemaModel.KEY_MAIN_FILE
 import com.bulifier.core.schemas.SchemaModel.KEY_PACKAGE
 import com.bulifier.core.schemas.SchemaModel.KEY_PROMPT
 import com.google.gson.Gson
@@ -93,9 +92,12 @@ class AiService : LifecycleService() {
         responses: List<ResponseItem>?
     ) {
         Log.d("AiService", "Processing history item: $historyItem")
-        val schemas = getSchemas(historyItem.schema)
+        val schemas = getSchemas(historyItem.schema, projectId = historyItem.projectId)
         Log.d("AiService", "Schemas: $schemas")
-        val settings = db.schemaDao().getSettings(historyItem.schema)
+        val settings = db.schemaDao().getSettings(
+            historyItem.schema,
+            projectId = historyItem.projectId
+        )
         Log.d("AiService", "Settings: $settings")
         val keys = schemas.flatMap { it.keys }.toSet()
         Log.d("AiService", "Keys: $keys")
@@ -187,7 +189,7 @@ class AiService : LifecycleService() {
     ) =
         db.fileDao().fetchFilesListByPathAndProjectId(historyItem.path, historyItem.projectId)
             .forEach { file ->
-                if(file.fileName == "update-schema.schema" && file.path == "schemas"){
+                if (file.fileName == "update-schema.schema" && file.path == "schemas") {
                     // don't mess up with the master schema
                     return
                 }
@@ -196,15 +198,14 @@ class AiService : LifecycleService() {
                     userPrompt = historyItem.prompt,
                     packageName = historyItem.path,
                     fileData = fileData,
-                    schemas = getSchemas(historyItem.schema)
+                    schemas = getSchemas(historyItem.schema, projectId = historyItem.projectId)
                 )
 
                 val messages = toMessages(schemas)
                 sendMessages(model, messages, historyItem)?.let { responseData ->
-                    if(settings.overrideFiles){
+                    if (settings.overrideFiles) {
                         overrideFile(fileData, responseData)
-                    }
-                    else {
+                    } else {
                         insertFile(responseData, file, settings)
                     }
                 }
@@ -268,14 +269,13 @@ class AiService : LifecycleService() {
                 path = file.path
             )
         ).run {
-            if(this == -1L){
+            if (this == -1L) {
                 db.fileDao().getFileId(
                     path = "schemas",
                     fileName = fileName,
                     projectId = projectId
                 ) ?: return
-            }
-            else{
+            } else {
                 this
             }
         }
@@ -395,7 +395,7 @@ class AiService : LifecycleService() {
         }
     }
 
-    private suspend fun getSchemas(name: String) = db.schemaDao().getSchema(name)
+    private suspend fun getSchemas(name: String, projectId: Long) = db.schemaDao().getSchema(name, projectId)
 
     private fun updateSchemaContent(
         schemaText: String,

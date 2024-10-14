@@ -24,6 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Date
 
 data class FullPath(
     val fileName: String?,
@@ -61,7 +62,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
             _openedFile.collectLatest { fileInfo ->
                 if (fileInfo != null) {
                     Log.d("MainViewModel", "open file ${fileInfo.fileId}")
-                    app.db.fileDao().getContentFlow(fileInfo.fileId).collect{
+                    app.db.fileDao().getContentFlow(fileInfo.fileId).collect {
                         Log.d("MainViewModel", "file content changed ${fileInfo.fileId}")
                         _fileContent.value = it?.content ?: ""
                     }
@@ -117,6 +118,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
                 fileId = file.fileId,
                 fileName = file.fileName,
                 path = file.path,
+                isFile = true,
                 content = "",
                 type = Content.Type.NONE
             )
@@ -224,14 +226,6 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    fun shareFiles() = viewModelScope.launch {
-        withContext(Dispatchers.IO) {
-            val projectId = projectId.flow.value
-            val files = db.fetchFilesListByProjectId(projectId)
-            MultiFileSharingUtil(app).shareFiles(files)
-        }
-    }
-
     fun deleteProject(project: Project) = viewModelScope.launch {
         db.deleteProject(project)
     }
@@ -239,17 +233,16 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     fun renameFile(file: File, newFileNameOrPath: String) = try {
         viewModelScope.launch {
             if (file.isFile) {
-                val newPath = if(newFileNameOrPath.trim().startsWith("/")){
+                val newPath = if (newFileNameOrPath.trim().startsWith("/")) {
                     newFileNameOrPath.substring(1)
-                }else{
+                } else {
                     newFileNameOrPath.trim()
                 }
 
                 val newFileName = newPath.substringAfterLast('/')
                 val newFilePath = newPath.substringBeforeLast('/')
                 db.updateFileName(file.copy(fileName = newFileName, path = newFilePath))
-            }
-            else{
+            } else {
                 db.updateFolderName(file, newFileNameOrPath)
             }
         }
@@ -261,10 +254,9 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun deleteFile(file: File) {
         viewModelScope.launch {
-            if(file.isFile) {
+            if (file.isFile) {
                 db.deleteFile(file.fileId)
-            }
-            else{
+            } else {
                 db.deleteFolder(file.fileId, file.path + "/" + file.fileName)
             }
         }
@@ -281,4 +273,14 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
             SchemaModel.resetSystemSchemas(projectId.flow.value)
         }
     }
+
+    suspend fun isProjectEmpty() = db.isProjectEmpty(projectId.flow.value)
+    suspend fun wasProjectJustUpdated(): Boolean {
+        val lastUpdated = db.getProject(projectId.flow.value)
+        return (Date().time - lastUpdated.lastUpdated.time) < 5000
+    }
+
+
 }
+
+

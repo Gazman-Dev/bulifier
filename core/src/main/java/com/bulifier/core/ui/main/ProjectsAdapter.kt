@@ -8,9 +8,14 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
 import com.bulifier.core.databinding.CoreItemProjectBinding
 import com.bulifier.core.db.Project
-import com.bulifier.core.ui.utils.showQuestionsDialog
+import com.bulifier.core.git.GitViewModel
+import com.bulifier.core.prefs.Prefs
 
-class ProjectsAdapter(private val mainViewModel:MainViewModel, private val onItemClick: (Project) -> Unit) :
+class ProjectsAdapter(
+    private val mainViewModel: MainViewModel,
+    private val gitViewModel: GitViewModel,
+    private val onItemClick: (Project) -> Unit
+) :
     PagingDataAdapter<Project, ProjectsAdapter.ProjectViewHolder>(ProjectComparator) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ProjectViewHolder(
@@ -30,7 +35,11 @@ class ProjectsAdapter(private val mainViewModel:MainViewModel, private val onIte
                         setTitle("Delete Project")
                         setMessage("Are you sure you want to delete the project? This action will delete all files, logs, and history related to this project.")
                         setPositiveButton("Delete") { _, _ ->
+                            if(Prefs.projectId.flow.value == project.projectId){
+                                Prefs.clear()
+                            }
                             mainViewModel.deleteProject(project)
+                            gitViewModel.deleteProject(project.projectName)
                         }
                         setNegativeButton("Cancel") { dialog, _ ->
                             dialog.dismiss()
