@@ -1,10 +1,7 @@
 package com.bulifier.core.ui.content
 
-import android.content.Context
 import android.text.TextWatcher
 import android.util.Log
-import android.view.View
-import android.view.inputmethod.InputMethodManager
 import android.widget.EditText
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
@@ -12,7 +9,7 @@ import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.ui.utils.hideKeyboard
 
 class ContentTextWatcher(
-    private val textBox:EditText,
+    private val textBox: EditText,
     private val viewModel: MainViewModel,
     lifecycleOwner: LifecycleOwner
 ) : DefaultLifecycleObserver {
@@ -40,7 +37,7 @@ class ContentTextWatcher(
 
         override fun afterTextChanged(s: android.text.Editable?) {
             val newText = s.toString()
-            if(newText == systemText){
+            if (newText == systemText) {
                 return
             }
             dirty = true
@@ -74,7 +71,7 @@ class ContentTextWatcher(
         verifyWatcher()
     }
 
-    fun stop(){
+    fun stop() {
         startRequested = false
         textBox.removeTextChangedListener(watcher)
         verifyWatcher()
