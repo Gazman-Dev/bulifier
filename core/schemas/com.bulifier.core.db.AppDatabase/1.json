@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "0ec76bf5e3f4eb1dc43a440cf11bafe7",
+    "identityHash": "22dc2263149103e465eb7c710b584daf",
     "entities": [
       {
         "tableName": "projects",
@@ -34,15 +34,6 @@
           ]
         },
         "indices": [
-          {
-            "name": "index_projects_project_id",
-            "unique": true,
-            "columnNames": [
-              "project_id"
-            ],
-            "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_projects_project_id` ON `${TABLE_NAME}` (`project_id`)"
-          },
           {
             "name": "index_projects_project_name",
             "unique": true,
@@ -530,13 +521,14 @@
         },
         "indices": [
           {
-            "name": "index_schema_settings_schema_name",
+            "name": "index_schema_settings_schema_name_project_id",
             "unique": true,
             "columnNames": [
-              "schema_name"
+              "schema_name",
+              "project_id"
             ],
             "orders": [],
-            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_schema_settings_schema_name` ON `${TABLE_NAME}` (`schema_name`)"
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_schema_settings_schema_name_project_id` ON `${TABLE_NAME}` (`schema_name`, `project_id`)"
           },
           {
             "name": "index_schema_settings_project_id",
@@ -566,7 +558,7 @@
     "views": [],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '0ec76bf5e3f4eb1dc43a440cf11bafe7')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '22dc2263149103e465eb7c710b584daf')"
     ]
   }
 }

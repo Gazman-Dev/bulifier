@@ -81,7 +81,6 @@ class SetConverter {
 
 @Entity(tableName = "projects", indices =
 [
-    Index(value = ["project_id"], unique = true),
     Index(value = ["project_name"], unique = true)
 ])
 @TypeConverters(DateTypeConverter::class)
@@ -140,7 +139,7 @@ data class Schema(
         onDelete = ForeignKey.CASCADE
     )],
     indices = [
-        Index(value = ["schema_name"], unique = true),
+        Index(value = ["schema_name", "project_id"], unique = true),
         Index(value = ["project_id"])
     ]
 )
