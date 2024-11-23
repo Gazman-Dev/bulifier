@@ -1,5 +1,12 @@
 # Bulifier Release Notes
 
+## Release 2.0.17
+ - switched to costume navigation system to better support cross module navigation
+ - Added hilt
+ - Temporary disabled the retry and reapply functionality since it is not fully implemented
+   - To retry a query just start a new one
+ - Fixed a lot of bugs!
+
 ## Release 1.1
 
 **New Features:**
