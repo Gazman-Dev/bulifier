@@ -4,7 +4,7 @@ import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
-import com.bulifier.core.databinding.CoreFileItemBinding
+import com.bulifier.core.databinding.FileItemBinding
 import com.bulifier.core.db.File
 import com.bulifier.core.ui.main.MainViewModel
 
@@ -27,7 +27,7 @@ class FilesAdapter(
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): FileViewHolder {
         val inflater = LayoutInflater.from(parent.context)
 
-        val binding = CoreFileItemBinding.inflate(inflater, parent, false)
+        val binding = FileItemBinding.inflate(inflater, parent, false)
         return FileViewHolder(binding, viewModel)
     }
 

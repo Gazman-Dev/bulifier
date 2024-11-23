@@ -10,7 +10,7 @@ abstract class BaseFragment<T : ViewBinding> : Fragment() {
 
     protected lateinit var binding: T
 
-    override fun onCreateView(
+    final override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?,
         savedInstanceState: Bundle?
     ) = createBinding(inflater, container).run {

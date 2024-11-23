@@ -6,7 +6,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import com.bulifier.core.databinding.CoreItemProjectBinding
+import com.bulifier.core.databinding.ItemProjectBinding
 import com.bulifier.core.db.Project
 import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.prefs.Prefs
@@ -19,7 +19,7 @@ class ProjectsAdapter(
     PagingDataAdapter<Project, ProjectsAdapter.ProjectViewHolder>(ProjectComparator) {
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ProjectViewHolder(
-        CoreItemProjectBinding.inflate(
+        ItemProjectBinding.inflate(
             LayoutInflater.from(parent.context),
             parent,
             false
@@ -35,7 +35,7 @@ class ProjectsAdapter(
                         setTitle("Delete Project")
                         setMessage("Are you sure you want to delete the project? This action will delete all files, logs, and history related to this project.")
                         setPositiveButton("Delete") { _, _ ->
-                            if(Prefs.projectId.flow.value == project.projectId){
+                            if (Prefs.projectId.flow.value == project.projectId) {
                                 Prefs.clear()
                             }
                             mainViewModel.deleteProject(project)
@@ -51,7 +51,7 @@ class ProjectsAdapter(
         }
     }
 
-    class ProjectViewHolder(val binding: CoreItemProjectBinding) :
+    class ProjectViewHolder(val binding: ItemProjectBinding) :
         RecyclerView.ViewHolder(binding.root)
 
     object ProjectComparator : DiffUtil.ItemCallback<Project>() {

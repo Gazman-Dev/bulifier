@@ -6,13 +6,11 @@ import android.text.TextWatcher
 import android.view.LayoutInflater
 import android.widget.ArrayAdapter
 import androidx.appcompat.app.AlertDialog
-import androidx.compose.ui.text.toLowerCase
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.databinding.DialogCheckoutBinding
 import com.bulifier.core.git.GitViewModel
 import kotlinx.coroutines.launch
-import java.util.Locale
 
 class CheckoutDialogManager(
     private val context: Context,

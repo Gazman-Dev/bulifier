@@ -1,42 +1,55 @@
 package com.bulifier.core.ui.ai.history_adapter
 
 import android.annotation.SuppressLint
-import android.content.Context
 import android.view.MotionEvent
 import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.core.content.ContextCompat
+import androidx.core.os.bundleOf
+import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.findNavController
 import androidx.recyclerview.widget.RecyclerView
 import com.bulifier.core.R
-import com.bulifier.core.databinding.CoreSelectedHistoryItemBinding
+import com.bulifier.core.databinding.SelectedHistoryItemBinding
 import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.db.HistoryStatus
-import com.bulifier.core.models.QuestionsModel
-import com.bulifier.core.models.questions.AnthropicQuestionsModel
 import com.bulifier.core.models.questions.ModelsQuestionsModel
-import com.bulifier.core.models.questions.OpenAiQuestionsModel
+import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.prefs.Prefs
-import com.bulifier.core.ui.ai.AiHistoryFragmentDirections
+import com.bulifier.core.schemas.SchemaModel
+import com.bulifier.core.security.ProductionSecurityFactory
+import com.bulifier.core.security.UiVerifier
 import com.bulifier.core.ui.ai.HistoryViewModel
+import com.bulifier.core.ui.ai.responses.ResponsesFragment
 import com.bulifier.core.ui.utils.hideKeyboard
+import com.bulifier.core.ui.utils.letAll
 import com.bulifier.core.ui.utils.showQuestionsDialog
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class SelectedHistoryViewHolder(
     private val viewModel: HistoryViewModel,
     private val historyList: RecyclerView,
-    private val binding: CoreSelectedHistoryItemBinding,
-    private val schemas: Array<String>,
-    private val viewLifecycleOwner: LifecycleOwner
+    private val binding: SelectedHistoryItemBinding,
+    viewLifecycleOwner: LifecycleOwner
 ) :
-    BaseHistoryViewHolder(binding.root, viewModel) {
+    BaseHistoryViewHolder(binding.root, viewModel, viewLifecycleOwner) {
+    private var schemas: Array<String>? = null
 
+    private val security by lazy {
+        EntryPointAccessors.fromApplication(
+            binding.root.context.applicationContext,
+            ProductionSecurityFactory::class.java
+        )
+    }
     private var ignoreTextUpdates = false
     private var historyItem: HistoryItem? = null
 
@@ -45,9 +58,8 @@ class SelectedHistoryViewHolder(
             when (historyItem?.status) {
                 HistoryStatus.RESPONDED, HistoryStatus.ERROR -> {
                     binding.root.findNavController().navigate(
-                        AiHistoryFragmentDirections.toResponsesFragment(
-                            historyItem!!.promptId,
-                        )
+                        ResponsesFragment::class.java,
+                        args = bundleOf("promptId" to historyItem!!.promptId)
                     )
                 }
 
@@ -62,8 +74,15 @@ class SelectedHistoryViewHolder(
             binding.root.hideKeyboard()
         }
 
-        binding.prompt.sendButton.setOnClickListener {
-            viewModel.send(binding.prompt.chatBox.text.toString(), binding.prompt.schemaSpinner.selectedItem.toString())
+        binding.prompt.sendButton.setOnClickListener { view ->
+            val uiVerifier: UiVerifier = security.uiVerifier()
+            if (!uiVerifier.verifySendAction(view)) {
+                return@setOnClickListener
+            }
+            viewModel.send(
+                binding.prompt.chatBox.text.toString(),
+                binding.prompt.schemaSpinner.selectedItem.toString()
+            )
             binding.root.hideKeyboard()
         }
 
@@ -83,121 +102,123 @@ class SelectedHistoryViewHolder(
             val adapter = ArrayAdapter<String>(
                 binding.root.context, android.R.layout.simple_spinner_item
             )
+            val addModelKey = "Add Model"
+            adapter.add(addModelKey)
             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
             binding.prompt.modelSpinner.adapter = adapter
 
-            val addModelKey = "Add Model"
             launch {
                 Prefs.models.flow.collect {
                     adapter.clear()
                     adapter.addAll(it + addModelKey)
                     updateBackground()
+                }
+            }
 
-                    binding.prompt.modelSpinner.onItemSelectedListener =
-                        object : AdapterView.OnItemSelectedListener {
-                            override fun onItemSelected(
-                                parent: AdapterView<*>?,
-                                view: View?,
-                                position: Int,
-                                id: Long
-                            ) {
-                                if (position == adapter.count - 1) {
-                                    viewLifecycleOwner.lifecycleScope.launch {
-                                        createModel()
+            binding.prompt.modelSpinner.setOnTouchListener { _, event ->
+                if (event.action == MotionEvent.ACTION_UP && adapter.count == 1) {
+                    viewLifecycleOwner.lifecycleScope.launch {
+                        createModel()
+                    }
+                    updateBackground()
+                    true
+                } else {
+                    false
+                }
+            }
+
+            binding.prompt.modelSpinner.onItemSelectedListener =
+                object : AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(
+                        parent: AdapterView<*>?,
+                        view: View?,
+                        position: Int,
+                        id: Long
+                    ) {
+                        if (position == adapter.count - 1) {
+                            viewLifecycleOwner.lifecycleScope.launch {
+                                createModel()
+                            }
+                        } else {
+                            val modelKey = adapter.getItem(position)!!
+                            viewModel.updateModelKey(modelKey)
+                        }
+                    }
+
+                    override fun onNothingSelected(parent: AdapterView<*>?) = Unit
+                }
+
+            updateBackground()
+        }
+    }
+
+    private fun createModel() {
+        if (binding.prompt.modelSpinnerContainer.visibility != View.VISIBLE) {
+            // don't show the dialog if the spinner is not visible
+            return
+        }
+        val context = binding.root.context
+        val scope = viewLifecycleOwner.lifecycleScope
+        val questionsModel = ModelsQuestionsModel()
+
+        showQuestionsDialog(questionsModel, context)
+            .onEach { completed ->
+                if (completed) {
+                    val selectedModel = questionsModel.selectedModel
+                    if (selectedModel == null) {
+                        Toast.makeText(
+                            context,
+                            "Invalid input",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        showQuestionsDialog(selectedModel, context)
+                            .onEach { selectedModelCompleted ->
+                                if (selectedModelCompleted) {
+                                    Prefs.models.apply {
+                                        val newModel = listOf(selectedModel.modelName)
+                                        set(flow.value + newModel)
                                     }
-                                } else {
-                                    val modelKey = adapter.getItem(position)!!
-                                    viewModel.updateModelKey(modelKey)
+                                    viewModel.updateModelKey(selectedModel.modelName)
                                 }
                             }
-
-                            override fun onNothingSelected(parent: AdapterView<*>?) = Unit
-                        }
-                }
-            }
-            if (Prefs.models.flow.value.isEmpty()) {
-                adapter.add(addModelKey)
-                binding.prompt.modelSpinner.setOnTouchListener { _, event ->
-                    if (event.action == MotionEvent.ACTION_UP && adapter.count == 1) {
-                        viewLifecycleOwner.lifecycleScope.launch {
-                            createModel()
-                        }
-                        updateBackground()
-                        true
-                    } else {
-                        false
+                            .launchIn(scope) // Launch the second collection in the same scope
                     }
                 }
-                updateBackground()
             }
-        }
-    }
+            .launchIn(scope) // Launch the first collection
 
-    private suspend fun createModel() {
-        val context = binding.root.context
-
-        val modelsQuestionsModel = ModelsQuestionsModel()
-        showQuestionsDialog(
-            modelsQuestionsModel,
-            context
-        ).collect { completed ->
-            if (completed) {
-                when (modelsQuestionsModel.model) {
-                    ModelsQuestionsModel.Model.OpenAI -> showModelQuestions(
-                        context,
-                        OpenAiQuestionsModel()
-                    )
-
-                    ModelsQuestionsModel.Model.Claude -> showModelQuestions(
-                        context,
-                        AnthropicQuestionsModel()
-                    )
-
-                    ModelsQuestionsModel.Model.Error, ModelsQuestionsModel.Model.ModelModels -> Toast.makeText(
-                        context,
-                        "Invalid input",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
-            }
-        }
-    }
-
-    private suspend fun showModelQuestions(context: Context, model: QuestionsModel) {
-        showQuestionsDialog(
-            model,
-            context
-        ).collect { completed ->
-            if (completed) {
-                Prefs.models.apply {
-                    val newModel = listOf(model.modelName)
-                    set(flow.value + newModel)
-                }
-                viewModel.updateModelKey(model.modelName)
-            }
-        }
     }
 
     private fun updateBackground() {
         binding.prompt.modelSpinner.background = if (Prefs.models.flow.value.isEmpty()) {
-            ContextCompat.getDrawable(binding.root.context, R.drawable.core_red_background)
+            ContextCompat.getDrawable(binding.root.context, R.drawable.red_background)
         } else {
             null
         }
     }
 
     private fun setupSchemas() {
-        val adapter = ArrayAdapter(
-            binding.root.context, android.R.layout.simple_spinner_item,
-            schemas
-        )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        binding.prompt.schemaSpinner.apply {
-            this.adapter = adapter
-            viewModel.selectedSchema?.let {
-                val selectedItem = schemas.map { s -> s.lowercase().trim() }.indexOf(it)
-                if (selectedItem != -1) {
-                    setSelection(selectedItem)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val schemas = withContext(Dispatchers.IO) {
+                SchemaModel.getSchemaNames()
+            }
+            this@SelectedHistoryViewHolder.schemas = schemas
+
+            val adapter = ArrayAdapter(
+                binding.root.context, android.R.layout.simple_spinner_item,
+                schemas
+            )
+            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+
+            binding.prompt.schemaSpinner.apply {
+                this.adapter = adapter
+                letAll(viewModel.selectedSchema, schemas) { selectedSchema, schemas ->
+                    val selectedItem =
+                        schemas.map { s -> s.lowercase().trim() }.indexOf(selectedSchema)
+                    if (selectedItem != -1) {
+                        setSelection(selectedItem)
+                    }
                 }
             }
         }
@@ -221,6 +242,7 @@ class SelectedHistoryViewHolder(
             else -> "Discard"
         }
 
+        binding.prompt.sendButton.isVisible = historyItem?.status == HistoryStatus.PROMPTING
         binding.prompt.sendButton.text = if (historyItem?.status == HistoryStatus.RESPONDED) {
             "Re-Apply"
         } else {

@@ -86,14 +86,13 @@ object SchemaModel {
                             projectId = projectId
                         )
                     ).run {
-                        if(this == -1L){
+                        if (this == -1L) {
                             db.fileDao().getFileId(
                                 path = "schemas",
                                 fileName = fileName,
                                 projectId = projectId
                             ) ?: return@withContext
-                        }
-                        else{
+                        } else {
                             this
                         }
                     }
@@ -125,19 +124,22 @@ object SchemaModel {
                     }
                     SchemaSettings(
                         schemaName = it.schemaName,
-                        fileExtension = map["file extension"] ?: "txt",
+                        outputExtension = map["output extension"] ?: "txt",
+                        inputExtension = map["input extension"] ?: "bul",
                         runForEachFile = map["run for each file"] == "true",
                         multiFilesOutput = map["multi files output"] == "true",
                         overrideFiles = map["override files"] == "true",
                         projectId = projectId
                     )
                 }
-                db.schemaDao().addSchemas(schemas.filter { it.type != SchemaType.SETTINGS }, settings)
+                db.schemaDao()
+                    .addSchemas(schemas.filter { it.type != SchemaType.SETTINGS }, settings)
             }
         }
     }
 
-    suspend fun getSchemaNames() = db.schemaDao().getSchemaNames(projectId = Prefs.projectId.flow.value)
+    suspend fun getSchemaNames() =
+        db.schemaDao().getSchemaNames(projectId = Prefs.projectId.flow.value)
 
     private fun parseSchema(content: String, schemaName: String, projectId: Long): List<Schema> {
         val pattern = """#(\s*)[0-9a-zA-Z_\-]+""".toRegex()

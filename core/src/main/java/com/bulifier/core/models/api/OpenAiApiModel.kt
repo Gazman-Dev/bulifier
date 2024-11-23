@@ -8,19 +8,25 @@ import com.aallam.openai.api.http.Timeout
 import com.aallam.openai.api.model.ModelId
 import com.aallam.openai.client.OpenAI
 import com.bulifier.core.api.MessageRequest
+import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.models.ApiModel
+import com.bulifier.core.models.ApiResponse
 import kotlin.time.Duration.Companion.minutes
 
-class OpenAiApiModel(openAiKey: String, openAiOrg: String, private val modelName: String) : ApiModel {
+class OpenAiApiModel(openAiKey: String, private val modelName: String) :
+    ApiModel {
 
 
     private val openAI = OpenAI(
         token = openAiKey,
-        organization = openAiOrg,
         timeout = Timeout(socket = 2.minutes),
     )
 
-    override suspend fun sendMessage(request: MessageRequest): String? {
+    override suspend fun sendMessage(
+        request: MessageRequest,
+        historyITem: HistoryItem,
+        id: Long
+    ): ApiResponse {
         val chatCompletionRequest = ChatCompletionRequest(
             model = ModelId(modelName),
             messages = request.messages.map {
@@ -35,6 +41,6 @@ class OpenAiApiModel(openAiKey: String, openAiOrg: String, private val modelName
             }
         )
         val completion: ChatCompletion = openAI.chatCompletion(chatCompletionRequest)
-        return completion.choices[0].message.content
+        return ApiResponse(completion.choices[0].message.content)
     }
 }

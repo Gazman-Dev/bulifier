@@ -3,7 +3,6 @@ package com.bulifier.core.ui.main
 import android.content.Context
 import android.content.Intent
 import androidx.core.content.FileProvider
-import com.bulifier.core.db.Content
 import com.bulifier.core.db.FileData
 import java.io.File
 import java.io.FileOutputStream
@@ -51,10 +50,11 @@ class MultiFileSharingUtil(
     }
 
     private fun deleteFileOrFolder(file: File) {
-        if(!file.exists()){
+        if (!file.exists()) {
             return
         }
-        if (file.isDirectory) {val children = file.listFiles()
+        if (file.isDirectory) {
+            val children = file.listFiles()
             if (children != null) {
                 for (child in children) {
                     deleteFileOrFolder(child)

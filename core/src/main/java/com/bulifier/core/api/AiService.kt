@@ -1,5 +1,6 @@
 package com.bulifier.core.api
 
+import android.os.Build
 import android.util.Log
 import androidx.lifecycle.LifecycleService
 import androidx.lifecycle.lifecycleScope
@@ -13,6 +14,7 @@ import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaSettings
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
+import com.bulifier.core.models.ApiModel
 import com.bulifier.core.models.QuestionsModel
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.schemas.SchemaModel.KEY_CONTEXT
@@ -21,9 +23,11 @@ import com.bulifier.core.schemas.SchemaModel.KEY_PACKAGE
 import com.bulifier.core.schemas.SchemaModel.KEY_PROMPT
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.concurrent.atomic.AtomicInteger
 
 class AiService : LifecycleService() {
 
@@ -53,9 +57,9 @@ class AiService : LifecycleService() {
     }
 
     private suspend fun process(historyItem: HistoryItem) {
+        Log.d("AiService", "processing: ${historyItem.promptId} ${historyItem.status}")
         if (historyItem.modelId == null) {
-            db.historyDao()
-                .markError(historyItem.promptId, "No model selected")
+            reportError(historyItem.promptId, "No model selected")
             return
         }
 
@@ -81,9 +85,12 @@ class AiService : LifecycleService() {
         } catch (e: Exception) {
             Log.e("AiService", "Error processing history item", e)
             e.printStackTrace()
-            db.historyDao()
-                .markError(historyItem.promptId, e.message ?: "Unknown error")
+            reportError(historyItem.promptId, e.message ?: "Unknown error")
         }
+    }
+
+    private suspend fun reportError(promptId: Long, errorMessage: String) {
+        db.historyDao().markError(promptId, errorMessage)
     }
 
     private suspend fun process(
@@ -91,21 +98,23 @@ class AiService : LifecycleService() {
         filesContext: List<FileData>,
         responses: List<ResponseItem>?
     ) {
-        Log.d("AiService", "Processing history item: $historyItem")
+        Log.d(
+            "AiService",
+            "Processing: ${historyItem.promptId} has fileContext: ${filesContext.isNotEmpty()} has responses: ${responses?.isNotEmpty()}"
+        )
         val schemas = getSchemas(historyItem.schema, projectId = historyItem.projectId)
-        Log.d("AiService", "Schemas: $schemas")
         val settings = db.schemaDao().getSettings(
             historyItem.schema,
             projectId = historyItem.projectId
         )
-        Log.d("AiService", "Settings: $settings")
+        Log.d("AiService", "Settings: ${historyItem.promptId}> $settings")
+
         val keys = schemas.flatMap { it.keys }.toSet()
-        Log.d("AiService", "Keys: $keys")
 
         val model = withContext(Dispatchers.IO) {
             loadModel(historyItem)
         }
-        Log.d("AiService", "Model: $model")
+        val apiModel = model.createApiModel()
 
         val fileData =
             if (keys.contains(KEY_MAIN_FILE) && historyItem.fileName?.isNotBlank() == true) {
@@ -113,10 +122,8 @@ class AiService : LifecycleService() {
                     .getContent(historyItem.path, historyItem.fileName, historyItem.projectId)
             } else null
 
-        Log.d("AiService", "File data: $fileData")
-
         if (settings.runForEachFile) {
-            processMultipleFiles(historyItem, model, settings)
+            processMultipleFiles(historyItem, settings, apiModel)
         } else {
             processSingleCall(
                 responses,
@@ -125,7 +132,7 @@ class AiService : LifecycleService() {
                 filesContext,
                 fileData,
                 schemas,
-                model
+                apiModel
             )
         }
     }
@@ -137,7 +144,7 @@ class AiService : LifecycleService() {
         filesContext: List<FileData>,
         fileData: FileData?,
         schemas: List<Schema>,
-        model: QuestionsModel
+        apiModel: ApiModel
     ) {
         val response = responses?.firstOrNull()?.run {
             Log.d("AiService", "Response: $this")
@@ -157,7 +164,7 @@ class AiService : LifecycleService() {
             )
             val messages = toMessages(processedSchemas)
 
-            sendMessages(model, messages, historyItem)
+            sendMessages(messages, historyItem, apiModel, 1)
         }
 
         response?.let { data ->
@@ -184,48 +191,94 @@ class AiService : LifecycleService() {
 
     private suspend fun processMultipleFiles(
         historyItem: HistoryItem,
-        model: QuestionsModel,
-        settings: SchemaSettings
-    ) =
-        db.fileDao().fetchFilesListByPathAndProjectId(historyItem.path, historyItem.projectId)
-            .forEach { file ->
-                if (file.fileName == "update-schema.schema" && file.path == "schemas") {
-                    // don't mess up with the master schema
-                    return
-                }
-                val fileData = db.fileDao().getContent(file.fileId)
-                val schemas: List<Schema> = prepareSchema(
-                    userPrompt = historyItem.prompt,
-                    packageName = historyItem.path,
-                    fileData = fileData,
-                    schemas = getSchemas(historyItem.schema, projectId = historyItem.projectId)
-                )
+        settings: SchemaSettings,
+        apiModel: ApiModel
+    ) = coroutineScope {
+        val files =
+            db.fileDao().fetchFilesListByPathAndProjectId(
+                historyItem.path,
+                settings.inputExtension,
+                historyItem.projectId
+            )
+        val progress = AtomicInteger(-1)
+        updateProgress(progress, files.size, historyItem)
+        files.forEach { file ->
+            if (file.fileName == "update-schema.schema" && file.path == "schemas") {
+                // don't mess up with the master schema
+                updateProgress(progress, files.size, historyItem)
+            } else {
+                launch {
+                    val fileData = db.fileDao().getContent(file.fileId)
+                    val schemas: List<Schema> = prepareSchema(
+                        userPrompt = historyItem.prompt,
+                        packageName = historyItem.path,
+                        fileData = fileData,
+                        schemas = getSchemas(historyItem.schema, projectId = historyItem.projectId)
+                    )
 
-                val messages = toMessages(schemas)
-                sendMessages(model, messages, historyItem)?.let { responseData ->
-                    if (settings.overrideFiles) {
-                        overrideFile(fileData, responseData)
-                    } else {
-                        insertFile(responseData, file, settings)
+                    val messages = toMessages(schemas)
+                    sendMessages(
+                        messages,
+                        historyItem,
+                        apiModel,
+                        file.fileId
+                    )?.let { responseData ->
+                        if (settings.overrideFiles) {
+                            overrideFile(fileData, responseData)
+                        } else {
+                            insertFile(responseData, file, settings)
+                        }
+                        updateProgress(progress, files.size, historyItem)
                     }
                 }
             }
+        }
+    }
+
+    private suspend fun updateProgress(count: AtomicInteger, total: Int, historyItem: HistoryItem) {
+        val progress = count.incrementAndGet() / total.toFloat()
+        Log.d("AiService", "Progress: $progress")
+        db.historyDao().updateProgress(historyItem.promptId, progress)
+    }
 
     private fun loadModel(historyItem: HistoryItem) =
         QuestionsModel.deserialize(historyItem.modelId!!)
             ?: throw Error("Model not found ${historyItem.modelId}")
 
     private suspend fun sendMessages(
-        model: QuestionsModel,
         messages: List<MessageData>,
-        historyItem: HistoryItem
-    ): ResponseData? {
-        val response = try {
-            model.createApiModel().sendMessage(MessageRequest(messages))
-                ?: run {
+        historyItem: HistoryItem,
+        apiModel: ApiModel,
+        id: Long
+    ): ResponseData? = withContext(Dispatchers.IO) {
+        try {
+            val apiResponse =
+                apiModel.sendMessage(MessageRequest(messages), historyItem, id)
+            if (apiResponse.isDone) {
+                if (apiResponse.message == null) {
                     db.historyDao().markError(historyItem.promptId, "No response")
-                    return null
+                    null
+                } else {
+                    val responseItem = ResponseItem(
+                        promptId = historyItem.promptId,
+                        request = Gson().toJson(messages),
+                        response = apiResponse.message
+                    )
+
+                    db.historyDao().addResponse(responseItem)
+
+                    val newHistoryItem = historyItem.copy(status = HistoryStatus.RESPONDED)
+                    db.historyDao().updateHistory(newHistoryItem)
+
+                    ResponseData(historyItem, apiResponse.message)
                 }
+            }
+            else{
+                if (apiResponse.error) {
+                    db.historyDao().markError(historyItem.promptId, apiResponse.message ?: "Internal Error")
+                }
+                null
+            }
         } catch (e: Exception) {
             e.printStackTrace()
             db.historyDao().markError(historyItem.promptId, e.message ?: "Unknown error")
@@ -236,21 +289,8 @@ class AiService : LifecycleService() {
                 response = e.message ?: "Unknown error"
             )
             db.historyDao().addResponse(responseItem)
-            return null
+            null
         }
-
-        val responseItem = ResponseItem(
-            promptId = historyItem.promptId,
-            request = Gson().toJson(messages),
-            response = response
-        )
-
-        db.historyDao().addResponse(responseItem)
-
-        val newHistoryItem = historyItem.copy(status = HistoryStatus.RESPONDED)
-        db.historyDao().updateHistory(newHistoryItem)
-
-        return ResponseData(historyItem, response)
     }
 
     private suspend fun insertFile(
@@ -293,7 +333,7 @@ class AiService : LifecycleService() {
         settings: SchemaSettings
     ): String {
         val baseName = inputFileName.lowercase().substringBeforeLast(".")
-        return "$baseName.${settings.fileExtension}"
+        return "$baseName.${settings.outputExtension}"
     }
 
     private fun removeFirstLine(input: String): String {
@@ -310,7 +350,12 @@ class AiService : LifecycleService() {
         val files = responseProcessor.parseResponse(responseData.response)
         files.forEach { item ->
             val pathParts = item.fullPath.split("/").toMutableList()
-            val fileName = pathParts.removeLast().run {
+            val last = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+                pathParts.removeLast()
+            } else {
+                pathParts.removeAt(pathParts.size - 1)
+            }
+            val fileName = last.run {
                 if (this.endsWith(".bul")) this else split(".")[0] + ".bul"
             }
 
@@ -395,7 +440,8 @@ class AiService : LifecycleService() {
         }
     }
 
-    private suspend fun getSchemas(name: String, projectId: Long) = db.schemaDao().getSchema(name, projectId)
+    private suspend fun getSchemas(name: String, projectId: Long) =
+        db.schemaDao().getSchema(name, projectId)
 
     private fun updateSchemaContent(
         schemaText: String,

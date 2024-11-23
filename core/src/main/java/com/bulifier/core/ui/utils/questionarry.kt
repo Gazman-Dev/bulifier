@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 data class Question(
     val title: String,
     val options: List<String>? = null, // Null if it's a text input question
+    val optionsVerifiers: List<() -> Boolean>? = null, // Optionally verifiers for options
     var response: String = "",
     val isPassword: Boolean = true // When true will hide the text
 )
@@ -23,7 +24,7 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): Flow<
     fun showDialog() {
         val currentQuestion = questionsModel.questions[currentIndex]
         val dialogBuilder = AlertDialog.Builder(context)
-        dialogBuilder.setTitle(currentQuestion.title + " (${currentIndex + 1}/${questionsModel.questions.size})")
+        dialogBuilder.setTitle(currentQuestion.title)
 
         if (currentQuestion.options == null) {
             // Text input question
@@ -55,13 +56,17 @@ fun showQuestionsDialog(questionsModel: QuestionsModel, context: Context): Flow<
 
             dialogBuilder.setPositiveButton(if (currentIndex == questionsModel.questions.size - 1) "Submit" else "Next") { _, _ ->
                 if (selected != -1) {
-                    currentQuestion.response = items[selected]
-                    currentIndex++
-                    if (currentIndex < questionsModel.questions.size) {
-                        showDialog()
+                    if (currentQuestion.optionsVerifiers?.get(selected)?.invoke() == false) {
+                        flow.value = false
                     } else {
-                        questionsModel.serialize()
-                        flow.value = true
+                        currentQuestion.response = items[selected]
+                        currentIndex++
+                        if (currentIndex < questionsModel.questions.size) {
+                            showDialog()
+                        } else {
+                            questionsModel.serialize()
+                            flow.value = true
+                        }
                     }
                 }
             }

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <color name="debug_color">#4CAF50</color>
+    <color name="colorPrimary">#6750A4</color>
+    <color name="colorPrimaryDark">#44356A</color>
+    <color name="colorAccent">#8019B8</color>
+    <color name="folder_color">#000000</color>
+
+</resources>

@@ -3,14 +3,13 @@ package com.bulifier.core.ui.ai.responses
 import android.view.LayoutInflater
 import android.view.ViewGroup
 import androidx.recyclerview.widget.RecyclerView
-import androidx.viewbinding.ViewBinding
-import com.bulifier.core.databinding.CoreResponseItemBinding
+import com.bulifier.core.databinding.ResponseItemBinding
 import com.bulifier.core.db.ResponseItem
 
 class ResponsesAdapter(val responses: List<ResponseItem>) :
     RecyclerView.Adapter<ResponsesAdapter.ResponsesViewHolder>() {
 
-    class ResponsesViewHolder(val binding: CoreResponseItemBinding) :
+    class ResponsesViewHolder(val binding: ResponseItemBinding) :
         RecyclerView.ViewHolder(binding.root) {
         fun bind(content: String) {
             binding.content.text = content
@@ -18,7 +17,7 @@ class ResponsesAdapter(val responses: List<ResponseItem>) :
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ResponsesViewHolder(
-        CoreResponseItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        ResponseItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
     )
 
     override fun onBindViewHolder(holder: ResponsesViewHolder, position: Int) {

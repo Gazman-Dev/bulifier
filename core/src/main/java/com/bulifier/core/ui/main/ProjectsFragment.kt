@@ -7,19 +7,19 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
-import com.bulifier.core.R
-import com.bulifier.core.databinding.CoreProjectsFragmentBinding
+import com.bulifier.core.databinding.ProjectsFragmentBinding
 import com.bulifier.core.git.GitViewModel
+import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.ui.core.BaseFragment
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 
-class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
+class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
 
     private val mainViewModel by activityViewModels<MainViewModel>()
     private val gitViewModel by activityViewModels<GitViewModel>()
@@ -27,13 +27,19 @@ class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
     override fun createBinding(
         inflater: LayoutInflater,
         container: ViewGroup?
-    ) = CoreProjectsFragmentBinding.inflate(inflater, container, false)
+    ) = ProjectsFragmentBinding.inflate(inflater, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
         binding.createButton.setOnClickListener {
             createOrOpenProject(binding.textBox.text.toString())
+        }
+        binding.toolbar.backButton.setOnClickListener{
+            findNavController().popBackStack()
+        }
+        if(findNavController().isBackStackEmpty()){
+            binding.toolbar.backButton.isVisible = false
         }
 
         binding.textBox.setOnEditorActionListener { textBox, actionId, _ ->
@@ -81,7 +87,11 @@ class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
         val projectsAdapter = ProjectsAdapter(mainViewModel, gitViewModel) {
             viewLifecycleOwner.lifecycleScope.launch {
                 mainViewModel.selectProject(it)
-                findNavController().navigate(R.id.mainFragment)
+                findNavController().navigate(
+                    MainFragment::class.java,
+                    clearBackStack = true,
+                    cacheFragment = true
+                )
             }
         }
         binding.projectsList.adapter = projectsAdapter
@@ -100,7 +110,11 @@ class ProjectsFragment : BaseFragment<CoreProjectsFragmentBinding>() {
         }
         lifecycleScope.launch {
             mainViewModel.createOrSelectProject(projectName)
-            findNavController().navigate(R.id.mainFragment)
+            findNavController().navigate(
+                MainFragment::class.java,
+                clearBackStack = true,
+                cacheFragment = true
+            )
         }
     }
 }

@@ -1,6 +1,7 @@
 # Settings
  - Run for each file: True
- - file extension: schema
+ - input extension: schema
+ - output extension: schema
  - multi files output: False
  - override files: True
 
@@ -21,13 +22,13 @@ Types:
 
 Each schema MUST have a Settings section with the following properties:
 * Run for each file: True/False // should run AI for each input file or just once
-* file extension: txt // IMPORTANT: Update this if it's currently 'txt'. DO NOT change if it's already something else.
+* output extension: txt // IMPORTANT: Update this if it's currently 'txt'. DO NOT change if it's already something else.
 * multi files output: True/False // will the output of a single AI call be one file or many
 * override files: True/False // whether to override existing files
 
 CRITICAL FILE EXTENSION RULES:
-1. If you see 'txt' as the file extension, you SHOULD update it to a more appropriate extension based on the project language.
-2. If you see 'bul' as the file extension, you MUST NOT change it under any circumstances. This is a special system extension.
+1. If you see 'txt' as the output extension, you SHOULD update it to a more appropriate extension based on the project language.
+2. If you see 'bul' as the output extension, you MUST NOT change it under any circumstances. This is a special system extension.
 3. Do not change the 'schema' extension in the Settings section above.
 
 Schema placeholders (DO NOT MODIFY THESE UNDER ANY CIRCUMSTANCES):
@@ -47,14 +48,14 @@ Update the schema based on the following guidelines:
 2. Add information about the project language if specified in the prompt.
 3. If more information is expected to come from the user but you already have this information then rephrase it to indicate so.
 4. Add information about any special libraries that should be used if mentioned in the prompt.
-5. Update the 'txt' file extension to an appropriate one based on the project language. DO NOT change any other extensions.
+5. Update the 'txt' output extension to an appropriate one based on the project language. DO NOT change any other extensions.
 6. NEVER mention, update, or replace anything related to the 'bul' extension. This is a system-specific term that should not appear in your output.
 7. Provide more context and be more specific wherever possible, based on the information in the prompt.
 8. Ensure all placeholders ([package], [context], [main_file], [prompt]) remain exactly as they are.
 9. Ensure all Section titles (Settings, System, User, System-loop if present) remain unchanged.
 
 CRITICAL REMINDERS:
-- Update ONLY the 'txt' file extension if present. Leave all other extensions unchanged.
+- Update ONLY the 'txt' output extension if present. Leave all other extensions unchanged.
 - DO NOT mention or modify anything related to 'bul'.
 - Preserve all placeholders and section titles exactly as they appear.
 - Only add information that is explicitly provided in the prompt.

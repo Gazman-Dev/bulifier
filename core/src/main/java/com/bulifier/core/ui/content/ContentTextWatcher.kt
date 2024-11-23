@@ -1,15 +1,15 @@
 package com.bulifier.core.ui.content
 
 import android.text.TextWatcher
-import android.util.Log
 import android.widget.EditText
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.ui.utils.hideKeyboard
+import com.bulifier.core.utils.Logger
 
 class ContentTextWatcher(
-    private val textBox: EditText,
+    private val textBox: ScrollableEditText,
     private val viewModel: MainViewModel,
     lifecycleOwner: LifecycleOwner
 ) : DefaultLifecycleObserver {
@@ -17,9 +17,9 @@ class ContentTextWatcher(
     private var dirty = false
     private var systemText = ""
     private val ticker = Ticker(lifecycleOwner) {
-        Log.d("FileContentFragment", "UI: tick")
         updateContent()
     }
+    private val logger = Logger("ContentTextWatcher")
 
     init {
         lifecycleOwner.lifecycle.addObserver(this)
@@ -28,11 +28,11 @@ class ContentTextWatcher(
     private val watcher = object : TextWatcher {
 
         override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
-
+            // No action required
         }
 
         override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-
+            // No action required
         }
 
         override fun afterTextChanged(s: android.text.Editable?) {
@@ -41,26 +41,28 @@ class ContentTextWatcher(
                 return
             }
             dirty = true
-            Log.d("FileContentFragment", "UI: Text updated ${newText.length}")
+            logger.d("Text updated, length: ${newText.length}")
         }
     }
 
     override fun onResume(owner: LifecycleOwner) {
         super.onResume(owner)
+        logger.d("ContentTextWatcherOnResume")
         verifyWatcher()
     }
 
     override fun onPause(owner: LifecycleOwner) {
+        logger.d("ContentTextWatcherOnPause")
         verifyWatcher()
         super.onPause(owner)
     }
 
     private fun verifyWatcher() {
         if (startRequested) {
-            Log.d("FileContentFragment", "UI: watcher added")
+            logger.d("Watcher added to textBox")
             textBox.addTextChangedListener(watcher)
         } else {
-            Log.d("FileContentFragment", "UI: watcher removed")
+            logger.d("Watcher removed from textBox")
             textBox.removeTextChangedListener(watcher)
             textBox.hideKeyboard()
         }
@@ -68,11 +70,13 @@ class ContentTextWatcher(
 
     fun start() {
         startRequested = true
+        logger.d("ContentTextWatcherStart")
         verifyWatcher()
     }
 
     fun stop() {
         startRequested = false
+        logger.d("ContentTextWatcherStop")
         textBox.removeTextChangedListener(watcher)
         verifyWatcher()
     }
@@ -81,8 +85,9 @@ class ContentTextWatcher(
         if (dirty && startRequested) {
             dirty = false
             val content = textBox.text.toString()
+            logger.d("Updating ViewModel with new content")
             viewModel.updateFileContent(content)
-            Log.d("FileContentFragment", toString() + "\nUI: viewModel updated\n\n$content\n\n")
+            logger.d("Content updated in ViewModel: $content")
         }
     }
 
@@ -90,5 +95,6 @@ class ContentTextWatcher(
         ticker.reset()
         systemText = text
         textBox.setText(text)
+        logger.d("TextBox content updated programmatically: $text")
     }
 }

@@ -78,8 +78,10 @@ class DbSyncHelper(
     suspend fun exportProject(projectId: Long, clearOldFiles: Boolean) {
         // Fetch the project name from the database or pass it as a parameter
         val projectName = db.fileDao().getProjectById(projectId).projectName
-        val srcDir = context.filesDir.createOverrideEmptyDirectory("$projectName/src", clearOldFiles)
-        val schemasDir = context.filesDir.createOverrideEmptyDirectory("$projectName/schemas", clearOldFiles)
+        val srcDir =
+            context.filesDir.createOverrideEmptyDirectory("$projectName/src", clearOldFiles)
+        val schemasDir =
+            context.filesDir.createOverrideEmptyDirectory("$projectName/schemas", clearOldFiles)
 
         db.fileDao().exportFilesAndContents(projectId).forEach { fileData ->
             val baseDir: File
@@ -130,7 +132,7 @@ class DbSyncHelper(
     private fun File.createOverrideEmptyDirectory(folderName: String, clearOldFiles: Boolean) =
         File(this, folderName).apply {
             mkdirs()
-            if(clearOldFiles) {
+            if (clearOldFiles) {
                 deleteAllFilesInFolder(this)
             }
         }

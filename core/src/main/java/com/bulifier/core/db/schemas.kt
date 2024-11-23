@@ -23,7 +23,7 @@ import java.util.Date
         Schema::class,
         ResponseItem::class,
         SchemaSettings::class
-    ], version = 1
+    ], version = 3
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun fileDao(): FileDao
@@ -79,10 +79,12 @@ class SetConverter {
     }
 }
 
-@Entity(tableName = "projects", indices =
-[
-    Index(value = ["project_name"], unique = true)
-])
+@Entity(
+    tableName = "projects", indices =
+    [
+        Index(value = ["project_name"], unique = true)
+    ]
+)
 @TypeConverters(DateTypeConverter::class)
 data class Project(
     @PrimaryKey(autoGenerate = true)
@@ -152,8 +154,11 @@ data class SchemaSettings(
     @ColumnInfo(name = "schema_name")
     val schemaName: String,
 
-    @ColumnInfo(name = "file_extension")
-    val fileExtension: String = "bul",
+    @ColumnInfo(name = "output_extension")
+    val outputExtension: String = "txt",
+
+    @ColumnInfo(name = "input_extension")
+    val inputExtension: String = "bul",
 
     @ColumnInfo(name = "run_for_each_file")
     val runForEachFile: Boolean = false,
@@ -280,6 +285,9 @@ data class HistoryItem(
 
     @ColumnInfo(name = "status")
     val status: HistoryStatus = HistoryStatus.PROMPTING,
+
+    @ColumnInfo(name = "progress")
+    val progress: Float = -1f,
 
     @ColumnInfo(name = "context_files")
     val contextFiles: List<Long> = emptyList(),
