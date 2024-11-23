@@ -2,10 +2,15 @@ package com.bulifier.core
 
 import android.content.ContentProvider
 import android.content.ContentValues
-import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
-import com.bulifier.core.api.AiService
+import com.bulifier.core.models.QuestionsModel
+import com.bulifier.core.models.questions.CLASS_GROUP_ANTHROPIC
+import com.bulifier.core.models.questions.AnthropicQuestionsModel
+import com.bulifier.core.models.questions.CLASS_GROUP_MODELS
+import com.bulifier.core.models.questions.ModelsQuestionsModel
+import com.bulifier.core.models.questions.CLASS_GROUP_OPEN_AI
+import com.bulifier.core.models.questions.OpenAiQuestionsModel
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.schemas.SchemaModel
 
@@ -15,7 +20,11 @@ class Setup : ContentProvider() {
         context!!.apply {
             Prefs.initialize(applicationContext)
             SchemaModel.init(applicationContext)
-            startService(Intent(this, AiService::class.java))
+        }
+        QuestionsModel.apply {
+            register(CLASS_GROUP_ANTHROPIC, AnthropicQuestionsModel::class.java)
+            register(CLASS_GROUP_OPEN_AI, OpenAiQuestionsModel::class.java)
+            register(CLASS_GROUP_MODELS, ModelsQuestionsModel::class.java)
         }
         return true
     }

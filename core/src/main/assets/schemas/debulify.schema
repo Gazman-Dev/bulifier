@@ -1,6 +1,7 @@
 # Settings
  - Run for each file: True
- - file extension: txt
+ - input extension: bul
+ - output extension: txt
  - multi files output: False
 
 # System

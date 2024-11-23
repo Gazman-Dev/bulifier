@@ -27,7 +27,7 @@ class Ticker(
         handler.postDelayed(tickerRunnable, intervalMillis)
     }
 
-    fun reset(){
+    fun reset() {
         handler.removeCallbacks(tickerRunnable)
         handler.postDelayed(tickerRunnable, intervalMillis)
     }

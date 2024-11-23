@@ -1,10 +1,11 @@
 package com.bulifier.core.ui.main.files
 
 import android.annotation.SuppressLint
+import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.RecyclerView
 import com.bulifier.core.R
-import com.bulifier.core.databinding.CoreFileItemBinding
+import com.bulifier.core.databinding.FileItemBinding
 import com.bulifier.core.db.File
 import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.ui.utils.showErrorDialog
@@ -12,7 +13,7 @@ import com.bulifier.core.ui.utils.showTextDialog
 import java.util.Locale
 
 class FileViewHolder(
-    private val binding: CoreFileItemBinding,
+    private val binding: FileItemBinding,
     private val viewModel: MainViewModel,
 ) :
     RecyclerView.ViewHolder(binding.root) {
@@ -33,6 +34,11 @@ class FileViewHolder(
 
     private fun showMenu() {
         val file = file ?: return
+        if (file.path.isBlank() && file.fileName == "schemas") {
+            Toast.makeText(binding.root.context, "Schemas folder is protected", Toast.LENGTH_SHORT)
+                .show()
+            return
+        }
         val options = mutableListOf(
             "Rename/Move",
             "Delete"
@@ -78,7 +84,7 @@ class FileViewHolder(
         this.file = file
         binding.itemTitle.text = file?.fileName ?: "----"
         if (file?.isFile != false) {
-            binding.itemIcon.setImageResource(R.drawable.core_baseline_file_24)
+            binding.itemIcon.setImageResource(R.drawable.baseline_file_24)
             binding.itemDetail.text = formatFileSize(file?.size)
             binding.root.setOnClickListener {
                 file?.let {
@@ -86,7 +92,7 @@ class FileViewHolder(
                 }
             }
         } else {
-            binding.itemIcon.setImageResource(R.drawable.core_baseline_folder_24)
+            binding.itemIcon.setImageResource(R.drawable.baseline_folder_24)
             binding.itemDetail.text = ""//"${file.filesCount} Files"
             binding.root.setOnClickListener {
                 viewModel.updatePath(

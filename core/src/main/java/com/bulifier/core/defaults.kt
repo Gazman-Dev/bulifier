@@ -7,9 +7,11 @@ data class FileContent(val file: File, val content: Content)
 
 val defaultSchemaFiles by lazy {
     arrayOf(
-        fileContent("bulify.schema", """
+        fileContent(
+            "bulify.schema", """
             
-        """.trimIndent())
+        """.trimIndent()
+        )
     )
 }
 

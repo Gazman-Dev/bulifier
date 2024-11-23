@@ -34,9 +34,7 @@ private fun getDatabase(context: Context): AppDatabase {
             .addTypeConverter(DateTypeConverter())
             .addTypeConverter(SetConverter())
             .addTypeConverter(LongListConverter())
-//            .addMigrations(Migration(1, 2){
-//                it.execSQL("ALTER TABLE history ADD COLUMN error_message TEXT DEFAULT NULL")
-//            })
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
             .build()
         INSTANCE = instance
         instance
@@ -116,6 +114,20 @@ interface HistoryDao {
         projectId: Long
     ): Flow<List<HistoryItem>>
 
+    @Query("""update history set status = 'SUBMITTED' where 
+        prompt_id in (:ids) and 
+        ((status = 'PROCESSING' and progress = -1) or (progress < 1 and progress != -1))
+    """)
+    suspend fun updateHistoryStatus(
+        ids: List<Long>
+    )
+
+    @Query("update history set status = :newStatus where prompt_id = :id")
+    suspend fun updateHistoryStatus(
+        id: Long,
+        newStatus: HistoryStatus
+    )
+
     @Query("update history set status = 'PROCESSING' where prompt_id = :promptId and status in (:statuses)")
     suspend fun startProcessingHistoryItem(
         promptId: Long,
@@ -131,20 +143,25 @@ interface HistoryDao {
     @Update
     suspend fun updateHistory(history: HistoryItem)
 
+    @Query("update history set progress = :progress where prompt_id = :promptId and progress < :progress")
+    suspend fun updateProgress(promptId: Long, progress: Float)
+
     @Query("update history set status = 'ERROR', error_message = :errorMessage where prompt_id = :promptId")
     suspend fun markError(promptId: Long, errorMessage: String)
 
-    @Update
-    suspend fun updateResponse(responseItem: ResponseItem)
+    data class ErrorData(val promptId: Long, val errorMessage: String)
+    @Transaction
+    suspend fun markErrors(errors: List<ErrorData>){
+        errors.forEach {
+            markError(it.promptId, it.errorMessage)
+        }
+    }
 
     @Query("SELECT * FROM responses WHERE prompt_id = :promptId")
     suspend fun getResponses(promptId: Long): List<ResponseItem>
 
-    @Transaction
-    suspend fun updateHistory(history: HistoryItem, responseItem: ResponseItem) {
-        updateHistory(history)
-        updateResponse(responseItem)
-    }
+    @Query("SELECT error_message FROM history WHERE prompt_id = :promptId")
+    suspend fun getErrorMessages(promptId: Long): String?
 
     @Insert
     suspend fun addResponse(responseItem: ResponseItem): Long
@@ -168,8 +185,8 @@ interface FileDao {
     @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
 
-    @Query("SELECT * FROM files WHERE path = :path AND project_id = :projectId")
-    suspend fun fetchFilesListByPathAndProjectId(path: String, projectId: Long): List<File>
+    @Query("SELECT * FROM files WHERE path = :path AND file_name like '%' || :extension AND project_id = :projectId")
+    suspend fun fetchFilesListByPathAndProjectId(path: String, extension: String, projectId: Long): List<File>
 
     @Query("SELECT contents.* FROM files join contents on files.file_id = contents.file_id WHERE project_id = :projectId and contents.type = :type")
     fun fetchFilesListByProjectIdAndType(

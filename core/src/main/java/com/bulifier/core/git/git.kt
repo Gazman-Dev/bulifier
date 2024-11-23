@@ -70,7 +70,7 @@ object GitHelper {
             .call()
     }
 
-    suspend fun fetch(repoDir: File, credentials: CredentialsProvider){
+    suspend fun fetch(repoDir: File, credentials: CredentialsProvider) {
         withContext(Dispatchers.IO) {
             Git.open(repoDir).use { git ->
                 git
@@ -98,7 +98,7 @@ object GitHelper {
                     git.checkout()
                         .setName(name)
                         .call()
-                } else if(remoteBranchRef != null){
+                } else if (remoteBranchRef != null) {
                     git.checkout()
                         .setCreateBranch(true)
                         .setName(name)
@@ -110,7 +110,7 @@ object GitHelper {
                     git.checkout()
                         .setName(ref.objectId.name)
                         .call()
-                } else{
+                } else {
                     throw IllegalArgumentException("Couldn't find branch or tag $name")
                 }
             }

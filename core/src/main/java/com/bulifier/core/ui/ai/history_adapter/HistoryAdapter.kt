@@ -6,8 +6,8 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.RecyclerView
-import com.bulifier.core.databinding.CoreHistoryItemBinding
-import com.bulifier.core.databinding.CoreSelectedHistoryItemBinding
+import com.bulifier.core.databinding.HistoryItemBinding
+import com.bulifier.core.databinding.SelectedHistoryItemBinding
 import com.bulifier.core.db.HistoryItemWithSelection
 import com.bulifier.core.ui.ai.HistoryViewModel
 
@@ -15,7 +15,6 @@ import com.bulifier.core.ui.ai.HistoryViewModel
 class HistoryAdapter(
     private val viewModel: HistoryViewModel,
     private val historyList: RecyclerView,
-    private val schemas: Array<String>,
     private val viewLifecycleOwner: LifecycleOwner
 ) :
     PagingDataAdapter<HistoryItemWithSelection, BaseHistoryViewHolder>(
@@ -27,18 +26,18 @@ class HistoryAdapter(
             SelectedHistoryViewHolder(
                 viewModel,
                 historyList,
-                CoreSelectedHistoryItemBinding.inflate(
+                SelectedHistoryItemBinding.inflate(
                     LayoutInflater.from(parent.context),
                     parent,
                     false
                 ),
-                schemas,
                 viewLifecycleOwner
             )
         } else {
             HistoryViewHolder(
                 viewModel,
-                CoreHistoryItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+                HistoryItemBinding.inflate(LayoutInflater.from(parent.context), parent, false),
+                viewLifecycleOwner
             )
         }.apply {
             onCreated()

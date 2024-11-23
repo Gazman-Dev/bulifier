@@ -21,19 +21,23 @@ import androidx.core.view.forEach
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
-import androidx.navigation.fragment.findNavController
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.bulifier.core.BuildConfig
 import com.bulifier.core.R
-import com.bulifier.core.databinding.CoreMainFragmentBinding
+import com.bulifier.core.databinding.MainFragmentBinding
 import com.bulifier.core.databinding.PopupCloneBinding
 import com.bulifier.core.databinding.PopupPushBinding
 import com.bulifier.core.git.GitError
 import com.bulifier.core.git.GitViewModel
+import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.security.UiVerifier
+import com.bulifier.core.ui.ai.AiHistoryFragment
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
@@ -41,11 +45,16 @@ import kotlinx.coroutines.launch
 import org.eclipse.jgit.transport.CredentialItem
 import org.eclipse.jgit.transport.URIish
 import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
+import javax.inject.Inject
 
 
 data class TitleAction(val title: String, val action: () -> Unit)
 
-class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
+@AndroidEntryPoint
+class MainFragment : BaseFragment<MainFragmentBinding>() {
+
+    @Inject
+    lateinit var uiVerifier: UiVerifier
 
     private val viewModel by activityViewModels<MainViewModel>()
     private val gitViewModel by activityViewModels<GitViewModel>()
@@ -72,15 +81,34 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
         }
     }
 
+    override fun onResume() {
+        super.onResume()
+        callback.isEnabled = true
+    }
+
+    override fun onPause() {
+        callback.isEnabled = false
+        super.onPause()
+    }
+
     override fun createBinding(
         inflater: LayoutInflater,
         container: ViewGroup?
-    ) = CoreMainFragmentBinding.inflate(inflater, container, false)
+    ) = MainFragmentBinding.inflate(inflater, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        registerPath()
+        binding.toolbar.settings.setOnClickListener {
+            PopupMenu(requireContext(), binding.toolbar.settings).apply {
+                inflate(R.menu.settings_menu)
+                setOnMenuItemClickListener {
+                    uiVerifier.verifyMenuAction(it, requireView())
+                    true
+                }
+                show()
+            }
+        }
         binding.toolbar.showProjects.setOnClickListener {
-            findNavController().navigate(R.id.projectsFragment)
+            findNavController().navigate(ProjectsFragment::class.java)
         }
         binding.toolbar.createFile.setOnClickListener {
             showCreateFileFolderDialog(true)
@@ -89,13 +117,13 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             showCreateFileFolderDialog(false)
         }
         binding.toolbar.jobs.setOnClickListener {
-            findNavController().navigate(R.id.aiHistoryFragment)
+            findNavController().navigate(AiHistoryFragment::class.java)
         }
         binding.bottomBar.ai.setOnClickListener {
             viewModel.fullPath.value.run {
                 historyViewModel.createNewAiJob(path, fileName)
             }
-            findNavController().navigate(R.id.aiHistoryFragment)
+            findNavController().navigate(AiHistoryFragment::class.java)
         }
 
         binding.bottomBar.gitButton.setOnClickListener {
@@ -135,6 +163,12 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             viewModel.resetSystemSchemas()
         }
 
+        requireActivity().onBackPressedDispatcher.addCallback(callback)
+    }
+
+    override fun onViewStateRestored(savedInstanceState: Bundle?) {
+        super.onViewStateRestored(savedInstanceState)
+        registerPath()
         viewLifecycleOwner.lifecycleScope.launch {
             gitViewModel.gitErrors.collect { gitError ->
                 when (gitError.type) {
@@ -173,17 +207,10 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             }
         }
 
-        requireActivity().onBackPressedDispatcher.addCallback(callback)
         viewLifecycleOwner.lifecycleScope.launch {
             gitViewModel.gitInfo.collect {
                 binding.bottomBar.info.text = it
                 delay(500) // allow some time to read the message
-            }
-        }
-
-        viewLifecycleOwner.lifecycleScope.launch {
-            if (viewModel.wasProjectJustUpdated()) {
-                clone()
             }
         }
     }
@@ -313,6 +340,9 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
             binding.overwriteProjectFiles.setOnCheckedChangeListener { _, _ ->
                 maybeEnableCloneButton(projectEmpty, binding, popup)
             }
+            binding.username.setText(BuildConfig.GIT_USERNAME)
+            binding.passwordToken.setText(BuildConfig.GIT_PASSWARD)
+            binding.repoUrl.setText(BuildConfig.GIT_REPO)
             maybeEnableCloneButton(projectEmpty, binding, popup)
         }
     }
@@ -407,7 +437,7 @@ class MainFragment : BaseFragment<CoreMainFragmentBinding>() {
                 if (isFile) "Enter a name of a file, no spaces or special characters." else
                     "Enter a name of a folder, no spaces or special characters."
             )
-            .setView(R.layout.core_dialog_create_file)
+            .setView(R.layout.dialog_create_file)
             .setPositiveButton("Create", null)
             .setNegativeButton("Cancel", null)
             .show()

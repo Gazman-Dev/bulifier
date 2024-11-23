@@ -11,5 +11,5 @@ data class MessageData(
     @SerializedName("role")
     val role: String,
     @SerializedName("content")
-    val content:String
+    val content: String
 )

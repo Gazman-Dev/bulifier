@@ -76,6 +76,7 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     suspend fun getResponses(promptId: Long) = historyDb.getResponses(promptId)
+    suspend fun getErrorMessages(promptId: Long) = historyDb.getErrorMessages(promptId)
 
     fun discard() {
         Log.d("HistoryViewModel", "discard: ${detailedItem.value}")
@@ -141,7 +142,10 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
                 modelId = Prefs.models.flow.value.firstOrNull()
             )
             val id = historyDb.addHistory(historyItem)
-            Log.d("HistoryViewModel", "createNewAiJob: id: $id path: $pathWithProjectName, $fileName")
+            Log.d(
+                "HistoryViewModel",
+                "createNewAiJob: id: $id path: $pathWithProjectName, $fileName"
+            )
             detailedItem.value = historyItem.copy(promptId = id)
         }
     }
