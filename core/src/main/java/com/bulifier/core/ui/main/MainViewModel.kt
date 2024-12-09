@@ -7,7 +7,6 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
 import androidx.paging.PagingConfig
-import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.bulifier.core.db.Content
 import com.bulifier.core.db.File
@@ -27,8 +26,6 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Date
-import kotlin.math.max
-import kotlin.math.min
 
 data class FullPath(
     val fileName: String?,
@@ -48,6 +45,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     private val _openedFile = MutableStateFlow<FileInfo?>(null)
     private val _fileContent = MutableStateFlow("")
     private val _fullPath = MutableStateFlow(FullPath(null, ""))
+
     val openedFile: StateFlow<FileInfo?> = _openedFile
     val fileContent: StateFlow<String> = _fileContent
     val fullPath: StateFlow<FullPath> = _fullPath
@@ -148,29 +146,30 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         _openedFile.value = null
     }
 
-    suspend fun createOrSelectProject(projectName: String) {
+    suspend fun createUpdateOrSelectProject(projectName: String, projectDetails: String? = null) {
         logger.i("createOrSelectProject", bundleOf("projectName" to projectName))
         val existingProject = db.getProject(projectName)
         if (existingProject != null) {
             logger.d("Project already exists: $projectName")
+            if (existingProject.projectDetails != projectDetails) {
+                db.updateProject(existingProject.copy(projectDetails = projectDetails))
+                logger.d("Project details updated: $projectName")
+            }
             selectProject(existingProject)
             return
         }
-        val projectId = db.insertProject(Project(projectName = projectName))
+        val project = Project(projectName = projectName, projectDetails = projectDetails)
+        val projectId = db.insertProject(project)
         logger.d("New project created with ID: $projectId")
         withContext(Dispatchers.Main) {
-            Prefs.projectId.set(projectId)
-            Prefs.projectName.set(projectName)
-            path.set("")
+            Prefs.updateProject(project.copy(projectId = projectId))
         }
     }
 
     suspend fun selectProject(project: Project) {
         logger.i("selectProject", bundleOf("projectId" to project.projectId))
         withContext(Dispatchers.Main) {
-            projectId.set(project.projectId)
-            projectName.set(project.projectName)
-            path.set("")
+            Prefs.updateProject(project)
         }
     }
 

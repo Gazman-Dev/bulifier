@@ -11,9 +11,7 @@ import deleteAllFilesInFolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.eclipse.jgit.transport.CredentialsProvider
@@ -24,7 +22,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     private val credentials = SecureCredentialManager(app)
     private val db by lazy { app.db.fileDao() }
 
-    val gitInfo: StateFlow<String> = MutableStateFlow("idle")
+    val gitUpdates: SharedFlow<String> = MutableSharedFlow()
     val gitErrors: SharedFlow<GitError> = MutableSharedFlow()
 
 
@@ -36,17 +34,19 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
 
     private fun resetGitInfo() {
         viewModelScope.launch {
-            gitInfo as MutableStateFlow
-            gitInfo.value = if (GitHelper.isCloneNeeded(repoDir)) {
-                "Git: Pending Clone"
-            } else {
-                try {
-                    "Git: ${GitHelper.currentBranch(repoDir)}"
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    "Git: Error " + e.message
+            gitUpdates as MutableSharedFlow
+            gitUpdates.emit(
+                if (GitHelper.isCloneNeeded(repoDir)) {
+                    "Git: Pending Clone"
+                } else {
+                    try {
+                        "Git: ${GitHelper.currentBranch(repoDir)}"
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                        "Git: Error " + e.message
+                    }
                 }
-            }
+            )
         }
     }
 
@@ -100,8 +100,10 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
                 GitHelper.clone(repoDir, creds, repoUrl)
                 syncDbToLocal(false) // override repo with project files
                 syncLocalToDb() // load all the files into the db
+
                 updateGitInfo("Reloading schemas")
                 SchemaModel.reloadSchemas(projectId.flow.value)
+
                 markGitInfoSuccess()
             } catch (e: Exception) {
                 reportError(e, "Clone")
@@ -109,9 +111,9 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
-    private fun updateGitInfo(message: String) {
-        gitInfo as MutableStateFlow
-        gitInfo.value = message
+    private suspend fun updateGitInfo(message: String) {
+        gitUpdates as MutableSharedFlow
+        gitUpdates.emit(message)
     }
 
     suspend fun fetch() {

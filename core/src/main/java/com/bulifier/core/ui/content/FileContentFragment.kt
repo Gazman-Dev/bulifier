@@ -7,26 +7,26 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.databinding.FileContentFragmentBinding
-import com.bulifier.core.navigation.findNavController
-import com.bulifier.core.ui.ai.AiHistoryFragment
-import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.utils.Logger
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import java.util.concurrent.atomic.AtomicInteger
 
 private val mainId = AtomicInteger(1)
+
 class FileContentFragment : Fragment() {
 
     private var textWatcher: ContentTextWatcher? = null
     private lateinit var binding: FileContentFragmentBinding
     private val viewModel: MainViewModel by activityViewModels()
-    private val historyViewModel: HistoryViewModel by activityViewModels()
     private val fragmentId = mainId.incrementAndGet()
     private val logger = Logger("FileContentFragment($fragmentId)")
 
@@ -43,6 +43,19 @@ class FileContentFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         logger.d("onViewCreated")
 
+        ViewCompat.setOnApplyWindowInsetsListener(binding.contentFrame) { view, insets ->
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemBarInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            view.setPadding(
+                systemBarInsets.left,
+                systemBarInsets.top,
+                systemBarInsets.right,
+                imeInsets.bottom
+            )
+            insets
+        }
+
         // Initialize your text watcher if needed
         val textWatcher = ContentTextWatcher(
             binding.textBox,
@@ -50,19 +63,6 @@ class FileContentFragment : Fragment() {
             viewLifecycleOwner
         )
         this.textWatcher = textWatcher
-
-        // AI button click listener
-        binding.ai.setOnClickListener {
-            try {
-                viewModel.fullPath.value.run {
-                    historyViewModel.createNewAiJob(path, fileName)
-                }
-                findNavController().navigate(AiHistoryFragment::class.java)
-                logger.i("AiButtonClicked")
-            } catch (e: Exception) {
-                logger.e("Error navigating to AiHistoryFragment", e)
-            }
-        }
 
         // Update textBox with content from ViewModel
         viewLifecycleOwner.lifecycleScope.launch {
@@ -130,14 +130,30 @@ class FileContentFragment : Fragment() {
         )
     }
 
+    override fun onSaveInstanceState(outState: Bundle) {
+        if (!this::binding.isInitialized) {
+            return
+        }
+        val textBox: ScrollableEditText = binding.textBox
+
+        val cursorPosition = textBox.selectionStart
+        outState.putInt("cursor_position", cursorPosition)
+        super.onSaveInstanceState(outState)
+    }
+
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         logger.d("onViewStateRestored")
         // Ensure you're on the main thread
         viewLifecycleOwner.lifecycleScope.launch {
+            delay(1)
             val content = viewModel.fileContent.value
             logger.d("UI: updated from model after state restored\n\n$content\n\n")
             textWatcher?.update(content)
+            val cursorPosition = savedInstanceState?.getInt("cursor_position", -1)
+            if (cursorPosition != -1 && cursorPosition != null && cursorPosition < content.length) {
+                binding.textBox.setSelection(cursorPosition)
+            }
         }
     }
 }

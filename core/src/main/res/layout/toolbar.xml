@@ -56,6 +56,15 @@
             android:layout_weight="1" />
 
         <ImageView
+            android:id="@+id/git"
+            android:layout_width="wrap_content"
+            android:layout_height="match_parent"
+            android:layout_margin="8dp"
+            android:adjustViewBounds="true"
+            android:src="@drawable/git_logo"
+            app:tint="@color/white" />
+
+        <ImageView
             android:id="@+id/jobs"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"

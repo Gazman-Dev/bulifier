@@ -1,7 +1,6 @@
 package com.bulifier.core.ui.content
 
 import android.text.TextWatcher
-import android.widget.EditText
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import com.bulifier.core.ui.main.MainViewModel
@@ -94,7 +93,15 @@ class ContentTextWatcher(
     fun update(text: String) {
         ticker.reset()
         systemText = text
-        textBox.setText(text)
-        logger.d("TextBox content updated programmatically: $text")
+        if (textBox.text.toString() != text) {
+            val cursorPosition = textBox.selectionStart
+            textBox.setText(text)
+            if (cursorPosition <= text.length) {
+                textBox.setSelection(cursorPosition)
+            } else {
+                textBox.setSelection(text.length) // Prevent invalid position
+            }
+            logger.d("TextBox content updated programmatically: $text")
+        }
     }
 }

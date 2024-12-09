@@ -15,6 +15,7 @@ import com.bulifier.core.databinding.ProjectsFragmentBinding
 import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.ui.core.BaseFragment
+import com.bulifier.core.ui.navigateToMain
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -33,16 +34,27 @@ class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
         super.onViewCreated(view, savedInstanceState)
 
         binding.createButton.setOnClickListener {
-            createOrOpenProject(binding.textBox.text.toString())
+            createOrOpenProject(binding.projectNameInput.text.toString())
         }
-        binding.toolbar.backButton.setOnClickListener{
+        binding.toolbar.backButton.setOnClickListener {
             findNavController().popBackStack()
         }
-        if(findNavController().isBackStackEmpty()){
+        if (findNavController().isBackStackEmpty()) {
             binding.toolbar.backButton.isVisible = false
         }
 
-        binding.textBox.setOnEditorActionListener { textBox, actionId, _ ->
+        setupProjectName()
+        setupProjectDetails()
+
+        setupProjectsList()
+    }
+
+    private fun setupProjectDetails() {
+
+    }
+
+    private fun setupProjectName() {
+        binding.projectNameInput.setOnEditorActionListener { textBox, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_DONE) {
                 createOrOpenProject(textBox.text.toString())
                 true
@@ -51,7 +63,7 @@ class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
             }
         }
 
-        binding.textBox.addTextChangedListener(object : TextWatcher {
+        binding.projectNameInput.addTextChangedListener(object : TextWatcher {
             private var job: Job? = null
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {
@@ -76,22 +88,16 @@ class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
             }
 
             override fun afterTextChanged(s: Editable?) {
-                binding.textBox.error = null
+                binding.projectNameInput.error = null
             }
         })
-
-        setupProjectsList()
     }
 
     private fun setupProjectsList() {
         val projectsAdapter = ProjectsAdapter(mainViewModel, gitViewModel) {
             viewLifecycleOwner.lifecycleScope.launch {
-                mainViewModel.selectProject(it)
-                findNavController().navigate(
-                    MainFragment::class.java,
-                    clearBackStack = true,
-                    cacheFragment = true
-                )
+                binding.projectNameInput.setText(it.projectName)
+                binding.projectDetailsInput.setText(it.projectDetails)
             }
         }
         binding.projectsList.adapter = projectsAdapter
@@ -105,16 +111,13 @@ class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
 
     private fun createOrOpenProject(projectName: String) {
         if (projectName.isBlank()) {
-            binding.textBox.error = "Project name cannot be empty"
+            binding.projectNameInput.error = "Project name cannot be empty"
             return
         }
         lifecycleScope.launch {
-            mainViewModel.createOrSelectProject(projectName)
-            findNavController().navigate(
-                MainFragment::class.java,
-                clearBackStack = true,
-                cacheFragment = true
-            )
+            val projectDetails = binding.projectDetailsInput.text.toString().trim().ifBlank { null }
+            mainViewModel.createUpdateOrSelectProject(projectName, projectDetails)
+            navigateToMain()
         }
     }
 }

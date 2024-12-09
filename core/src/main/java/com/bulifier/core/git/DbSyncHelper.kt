@@ -1,5 +1,6 @@
 import android.content.Context
 import com.bulifier.core.db.Content
+import com.bulifier.core.db.FileData
 import com.bulifier.core.db.db
 import java.io.File
 import com.bulifier.core.db.File as DbFile
@@ -16,34 +17,27 @@ class DbSyncHelper(
 
         // Define the project directory
         val projectDir = File(context.filesDir, projectName)
-        val srcDir = File(projectDir, "src")
-        val schemasDir = File(projectDir, "schemas")
 
         db.fileDao().deleteFilesByProjectId(projectId)
 
-        // Process the src directory with an empty path
-        processDirectory(srcDir, "", projectId)
-
-        // Process the schemas directory with path "schemas"
-        processDirectory(schemasDir, "schemas", projectId)
+        processDirectory(projectDir, "", projectId)
     }
 
     private suspend fun processDirectory(currentDir: File, parentPath: String, projectId: Long) {
         if (!currentDir.exists()) return
-
-        val schemasRoot = DbFile(
-            projectId = projectId,
-            path = "",
-            fileName = "schemas",
-            isFile = false
-        )
-        db.fileDao().insertFile(schemasRoot)
 
         currentDir.listFiles()?.forEach { file ->
             val fileName = file.name
             val isFile = file.isFile
             val size = if (isFile) file.length().toInt() else 0
             val path = parentPath
+
+            if (fileName.lowercase().trim() == ".git") {
+                return@forEach
+            }
+            if (isFile && !isTextFile(file)) {
+                return@forEach
+            }
 
             // Create and insert the File entity
             val fileEntity = DbFile(
@@ -56,7 +50,6 @@ class DbSyncHelper(
             val fileId = db.fileDao().insertFile(fileEntity)
 
             if (isFile) {
-                // Read the file content and insert the Content entity
                 val content = file.readText()
                 val contentEntity = Content(
                     fileId = fileId,
@@ -78,28 +71,31 @@ class DbSyncHelper(
     suspend fun exportProject(projectId: Long, clearOldFiles: Boolean) {
         // Fetch the project name from the database or pass it as a parameter
         val projectName = db.fileDao().getProjectById(projectId).projectName
-        val srcDir =
-            context.filesDir.createOverrideEmptyDirectory("$projectName/src", clearOldFiles)
-        val schemasDir =
-            context.filesDir.createOverrideEmptyDirectory("$projectName/schemas", clearOldFiles)
+        val srcDir = File(context.filesDir, "$projectName/").apply {
+            context.filesDir.mkdirs()
+        }
 
-        db.fileDao().exportFilesAndContents(projectId).forEach { fileData ->
-            val baseDir: File
-            val relativePath: String
-
-            if (fileData.path == "schemas") {
-                // Files in the 'schemas' package are stored in 'project_name/schemas'
-                baseDir = schemasDir
-                relativePath = "" // No additional relative path under schemas
+        val files: List<FileData> = db.fileDao().exportFilesAndContents(projectId)
+        files.mapNotNull {
+            if (it.isFile) {
+                null
             } else {
-                // All other files are stored in 'project_name/src'
-                baseDir = srcDir
-                relativePath = fileData.path
+                it.path + "/" + it.fileName
             }
+        }.toSet().forEach {
+            File(srcDir, it).apply {
+                mkdirs()
+                if (clearOldFiles) {
+                    deleteAllFilesInFolder(this)
+                }
+            }
+        }
 
+
+        files.forEach { fileData ->
             exportFile(
-                baseDir = baseDir,
-                relativePath = relativePath,
+                baseDir = srcDir,
+                relativePath = fileData.path,
                 fileName = fileData.fileName,
                 content = fileData.content,
                 isFile = fileData.isFile
@@ -128,14 +124,6 @@ class DbSyncHelper(
             filePath.mkdirs()
         }
     }
-
-    private fun File.createOverrideEmptyDirectory(folderName: String, clearOldFiles: Boolean) =
-        File(this, folderName).apply {
-            mkdirs()
-            if (clearOldFiles) {
-                deleteAllFilesInFolder(this)
-            }
-        }
 }
 
 fun deleteAllFilesInFolder(folder: File) {
@@ -153,3 +141,38 @@ fun deleteAllFilesInFolder(folder: File) {
         }
     }
 }
+
+fun isTextFile(file: File, sampleSize: Int = 1024): Boolean {
+    return try {
+        val buffer = ByteArray(sampleSize)
+        val inputStream = file.inputStream()
+        val bytesRead = inputStream.read(buffer)
+        inputStream.close()
+
+        // Check each character in the buffer
+        buffer.take(bytesRead).forEach { byte ->
+            if (!byte.toInt().toChar().isPrintable()) {
+                return false // Immediately reject if a non-printable character is found
+            }
+        }
+        true // If no non-printable characters are found, it's a text file
+    } catch (e: Exception) {
+        e.printStackTrace()
+        false // Treat exceptions as non-printable (e.g., file read errors)
+    }
+}
+
+// Updated isPrintable function
+fun Char.isPrintable(): Boolean {
+    val codePoint = this.code
+    return this in '\u0020'..'\u007E' || // Basic ASCII
+            this in '\u00A0'..'\u00FF' || // Latin-1 Supplement
+            this.isLetterOrDigit() || // Letters and digits from all scripts
+            this.isWhitespace() || // Space, tab, etc.
+            (codePoint in 0x1F300..0x1F5FF) || // Miscellaneous Symbols and Pictographs
+            (codePoint in 0x1F600..0x1F64F) || // Emoticons
+            (codePoint in 0x1F680..0x1F6FF) || // Transport and Map Symbols
+            (codePoint in 0x2600..0x26FF) || // Miscellaneous Symbols
+            (codePoint in 0x2700..0x27BF) // Dingbats
+}
+

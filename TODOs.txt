@@ -1,7 +1,0 @@
- - do the schema by dedicating a folder for it
- - Add a toggle for the prompt to see the rendered command + allow to copy it
- - do the AI service
- - the response are files, add option to accept all files
- - add file preview
- - add option to accept a file from the preview
-

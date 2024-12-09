@@ -22,12 +22,14 @@ object SchemaModel {
     const val KEY_CONTEXT = "context"
     const val KEY_PROMPT = "prompt"
     const val KEY_MAIN_FILE = "main_file"
+    const val PROJECT_DETAILS = "project_details"
 
     private val keys = setOf(
         KEY_PACKAGE,
         KEY_CONTEXT,
         KEY_PROMPT,
-        KEY_MAIN_FILE
+        KEY_MAIN_FILE,
+        PROJECT_DETAILS
     )
 
     private val job = Job()
@@ -173,7 +175,7 @@ object SchemaModel {
 
             val keys = extractKeys(sections[index])
             if (!SchemaModel.keys.containsAll(keys)) {
-                throw IllegalArgumentException("Invalid keys in schema ${keys.joinToString()}")
+                throw IllegalArgumentException("Schema error - Invalid keys: [${keys.joinToString()}]")
             }
 
             Schema(

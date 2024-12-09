@@ -40,7 +40,7 @@ class ResponsesFragment : BaseFragment<ResponsesFragmentBinding>() {
 
         binding.copyButton.setOnClickListener {
             val message = errorMessage ?: adapter?.getContent(binding.viewPager.currentItem)
-                ?: return@setOnClickListener
+            ?: return@setOnClickListener
             copyTextToClipboard(message)
             Toast.makeText(requireContext(), "Copied to clipboard", Toast.LENGTH_SHORT).show()
         }
@@ -48,13 +48,12 @@ class ResponsesFragment : BaseFragment<ResponsesFragmentBinding>() {
         viewLifecycleOwner.lifecycleScope.launch {
             val promptId = arguments?.getLong(KEY_PROMPT_ID) ?: -1
             errorMessage = viewModel.getErrorMessages(promptId)
-            if(errorMessage != null){
+            if (errorMessage != null) {
                 binding.errorMessage.text = errorMessage
                 binding.errorMessage.isVisible = true
                 binding.viewPager.isVisible = false
                 binding.dotsIndicator.isVisible = false
-            }
-            else{
+            } else {
                 val responses = viewModel.getResponses(promptId)
                 adapter = ResponsesAdapter(responses)
                 binding.viewPager.adapter = adapter

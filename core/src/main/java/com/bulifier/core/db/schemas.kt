@@ -23,7 +23,7 @@ import java.util.Date
         Schema::class,
         ResponseItem::class,
         SchemaSettings::class
-    ], version = 3
+    ], version = DB_VERSION
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun fileDao(): FileDao
@@ -93,6 +93,9 @@ data class Project(
 
     @ColumnInfo(name = "project_name")
     val projectName: String,
+
+    @ColumnInfo(name = "project_details")
+    val projectDetails: String? = null,
 
     @ColumnInfo(name = "last_updated")
     var lastUpdated: Date = Date()

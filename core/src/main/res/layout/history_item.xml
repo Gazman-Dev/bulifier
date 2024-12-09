@@ -22,6 +22,8 @@
             android:layout_marginTop="4dp"
             android:textColor="@color/white"
             android:textSize="18sp"
+            android:maxLines="1"
+            android:ellipsize="end"
             app:layout_constraintEnd_toStartOf="@+id/status"
             app:layout_constraintStart_toStartOf="parent"
             app:layout_constraintTop_toTopOf="parent"

@@ -8,6 +8,8 @@ import android.widget.ArrayAdapter
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.core.widget.addTextChangedListener
 import androidx.lifecycle.LifecycleOwner
@@ -91,6 +93,35 @@ class SelectedHistoryViewHolder(
                 viewModel.updatePrompt(it?.toString())
             }
         }
+
+        ViewCompat.setOnApplyWindowInsetsListener(binding.prompt.chatBox) { view, insets ->
+            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemBarInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+
+            view.setPadding(
+                systemBarInsets.left,
+                systemBarInsets.top,
+                systemBarInsets.right,
+                imeInsets.bottom
+            )
+            insets
+        }
+
+        binding.prompt.chatBox.setOnTouchListener { v, event ->
+            // This only matters if the parent (RecyclerView) can intercept touches.
+            if (event.action == MotionEvent.ACTION_DOWN) {
+                // Explicitly request focus
+                v.requestFocus()
+            }
+            if (v.hasFocus()) {
+                v.parent.requestDisallowInterceptTouchEvent(true)
+                if (event.action == MotionEvent.ACTION_UP || event.action == MotionEvent.ACTION_CANCEL) {
+                    v.parent.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+            false
+        }
+
 
         setupSchemas()
         setupModels()

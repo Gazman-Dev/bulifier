@@ -10,6 +10,7 @@ import com.bulifier.core.ui.utils.Question
 import javax.inject.Inject
 
 const val CLASS_GROUP_MODELS = "CLASS_GROUP_MODELS"
+
 class ModelsQuestionsModel @Inject constructor() : QuestionsModel(CLASS_GROUP_MODELS,
     listOf(
         Question(title = "What model to create?",
