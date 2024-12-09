@@ -1,5 +1,24 @@
 # Bulifier Release Notes
 
+## Release 2.1.05
+ - Updated schemas
+   - updated bulify schema 
+     - added examples
+     - using the name from the ai output instead of relying on settings
+     - upending .bul to what ever ai gives back like game.py.bul
+   - updated debulify schema
+     - now it can generate output with multiple file types
+       - no longer relying solely on output file extension from settings
+       - if the file is with the structure of "xxxx.xxx.bul" it will remove the bul and use the remaining extension
+  - Improved ui
+   - Removed bottom bar
+   - Moved git to top bar
+   - Added clear action button to invoke AI
+ - Update GIT
+   - clone as is - made it easier to work with existing projects by cloning them as is
+   - Adjusted the project sync functionality - Instead of deleting all the local files 
+     it will delete only the files in folders used by the project
+
 ## Release 2.0.17
  - switched to costume navigation system to better support cross module navigation
  - Added hilt

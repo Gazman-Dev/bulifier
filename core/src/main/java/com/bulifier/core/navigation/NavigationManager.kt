@@ -23,7 +23,7 @@ class NavigationManager(
                 popBackStack()
             }
         })
-        fragmentManager.addOnBackStackChangedListener{
+        fragmentManager.addOnBackStackChangedListener {
             if (fragmentManager.backStackEntryCount == 0 && allowToFinish) {
                 activity.finish()
             }

@@ -9,6 +9,7 @@ import com.bulifier.core.db.File
 import com.bulifier.core.db.FileData
 import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.db.HistoryStatus
+import com.bulifier.core.db.Project
 import com.bulifier.core.db.ResponseItem
 import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaSettings
@@ -21,6 +22,7 @@ import com.bulifier.core.schemas.SchemaModel.KEY_CONTEXT
 import com.bulifier.core.schemas.SchemaModel.KEY_MAIN_FILE
 import com.bulifier.core.schemas.SchemaModel.KEY_PACKAGE
 import com.bulifier.core.schemas.SchemaModel.KEY_PROMPT
+import com.bulifier.core.schemas.SchemaModel.PROJECT_DETAILS
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
@@ -28,6 +30,7 @@ import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
+import kotlin.text.replace
 
 class AiService : LifecycleService() {
 
@@ -122,8 +125,9 @@ class AiService : LifecycleService() {
                     .getContent(historyItem.path, historyItem.fileName, historyItem.projectId)
             } else null
 
+        val project = db.fileDao().getProject(historyItem.projectId)
         if (settings.runForEachFile) {
-            processMultipleFiles(historyItem, settings, apiModel)
+            processMultipleFiles(historyItem, settings, apiModel, project)
         } else {
             processSingleCall(
                 responses,
@@ -132,7 +136,8 @@ class AiService : LifecycleService() {
                 filesContext,
                 fileData,
                 schemas,
-                apiModel
+                apiModel,
+                project
             )
         }
     }
@@ -144,7 +149,8 @@ class AiService : LifecycleService() {
         filesContext: List<FileData>,
         fileData: FileData?,
         schemas: List<Schema>,
-        apiModel: ApiModel
+        apiModel: ApiModel,
+        project: Project
     ) {
         val response = responses?.firstOrNull()?.run {
             Log.d("AiService", "Response: $this")
@@ -154,6 +160,7 @@ class AiService : LifecycleService() {
             }
         } ?: kotlin.run {
             val processedSchemas: List<Schema> = prepareSchema(
+                project = project,
                 userPrompt = historyItem.prompt,
                 packageName = historyItem.path,
                 filesContext = filesContext.map {
@@ -169,7 +176,7 @@ class AiService : LifecycleService() {
 
         response?.let { data ->
             if (settings.multiFilesOutput) {
-                applyMultiFileOutput(data)
+                applyMultiFileOutput(data, historyItem.path)
             } else {
                 overrideFile(fileData, data)
             }
@@ -192,7 +199,8 @@ class AiService : LifecycleService() {
     private suspend fun processMultipleFiles(
         historyItem: HistoryItem,
         settings: SchemaSettings,
-        apiModel: ApiModel
+        apiModel: ApiModel,
+        project: Project
     ) = coroutineScope {
         val files =
             db.fileDao().fetchFilesListByPathAndProjectId(
@@ -210,6 +218,7 @@ class AiService : LifecycleService() {
                 launch {
                     val fileData = db.fileDao().getContent(file.fileId)
                     val schemas: List<Schema> = prepareSchema(
+                        project = project,
                         userPrompt = historyItem.prompt,
                         packageName = historyItem.path,
                         fileData = fileData,
@@ -272,10 +281,10 @@ class AiService : LifecycleService() {
 
                     ResponseData(historyItem, apiResponse.message)
                 }
-            }
-            else{
+            } else {
                 if (apiResponse.error) {
-                    db.historyDao().markError(historyItem.promptId, apiResponse.message ?: "Internal Error")
+                    db.historyDao()
+                        .markError(historyItem.promptId, apiResponse.message ?: "Internal Error")
                 }
                 null
             }
@@ -332,8 +341,12 @@ class AiService : LifecycleService() {
         inputFileName: String,
         settings: SchemaSettings
     ): String {
-        val baseName = inputFileName.lowercase().substringBeforeLast(".")
-        return "$baseName.${settings.outputExtension}"
+        val baseName = inputFileName.substringBeforeLast(".")
+        return if (baseName.contains(".")) {
+            baseName
+        } else {
+            "$baseName.${settings.outputExtension}"
+        }
     }
 
     private fun removeFirstLine(input: String): String {
@@ -345,9 +358,9 @@ class AiService : LifecycleService() {
         }
     }
 
-    private suspend fun applyMultiFileOutput(responseData: ResponseData) {
+    private suspend fun applyMultiFileOutput(responseData: ResponseData, basePath: String) {
         val projectId = responseData.historyItem.projectId
-        val files = responseProcessor.parseResponse(responseData.response)
+        val files = responseProcessor.parseResponse(responseData.response, basePath)
         files.forEach { item ->
             val pathParts = item.fullPath.split("/").toMutableList()
             val last = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
@@ -355,9 +368,7 @@ class AiService : LifecycleService() {
             } else {
                 pathParts.removeAt(pathParts.size - 1)
             }
-            val fileName = last.run {
-                if (this.endsWith(".bul")) this else split(".")[0] + ".bul"
-            }
+            val fileName = "$last.bul"
 
             val path = pathParts.joinToString("/")
             val fileId = db.fileDao().insertFile(
@@ -400,6 +411,7 @@ class AiService : LifecycleService() {
     }
 
     private suspend fun prepareSchema(
+        project: Project,
         userPrompt: String, packageName: String,
         filesContext: List<String>? = null,
         fileData: FileData? = null,
@@ -409,32 +421,36 @@ class AiService : LifecycleService() {
             when (schema.type) {
                 SchemaType.SETTINGS -> emptyList()
                 SchemaType.CONTEXT -> {
-                    filesContext?.map {
-                        schema.copy(
-                            content = updateSchemaContent(
-                                schema.content,
-                                schema.keys,
-                                userPrompt,
-                                packageName,
-                                fileData
-                            )
-                                .replace("{$KEY_CONTEXT}", it)
+                    filesContext?.mapNotNull {
+                        val content = updateSchemaContent(
+                            project,
+                            schema.content,
+                            schema.keys,
+                            userPrompt,
+                            packageName,
+                            fileData,
+                            it
                         )
+                        content?.let {
+                            schema.copy(content = it)
+                        }
+
                     } ?: emptyList()
                 }
 
                 else -> {
-                    listOf(
-                        schema.copy(
-                            content = updateSchemaContent(
-                                schema.content,
-                                schema.keys,
-                                userPrompt,
-                                packageName,
-                                fileData
-                            )
+                    updateSchemaContent(
+                        project,
+                        schema.content,
+                        schema.keys,
+                        userPrompt,
+                        packageName,
+                        fileData
+                    )?.let {
+                        listOf(
+                            schema.copy(content = it)
                         )
-                    )
+                    } ?: emptyList()
                 }
             }
         }
@@ -444,23 +460,31 @@ class AiService : LifecycleService() {
         db.schemaDao().getSchema(name, projectId)
 
     private fun updateSchemaContent(
+        project: Project,
         schemaText: String,
         keys: LinkedHashSet<String>,
         userPrompt: String,
         packageName: String,
-        fileData: FileData?
-    ): String {
-        var result = schemaText
-        if (keys.contains(KEY_PACKAGE)) {
-            result = result.replace("{$KEY_PACKAGE}", packageName)
+        fileData: FileData?,
+        context: String? = null
+    ): String? {
+        var content = schemaText
+        mapOf(
+            KEY_PACKAGE to packageName,
+            KEY_PROMPT to userPrompt,
+            KEY_MAIN_FILE to fileData?.content,
+            PROJECT_DETAILS to project.projectDetails,
+            KEY_CONTEXT to context
+        ).forEach { key, value ->
+            if (keys.contains(key) &&
+                value != null &&
+                value.isNotBlank()
+            ) {
+                content = content.replace("{$key}", value)
+            }
         }
-        if (keys.contains(KEY_PROMPT)) {
-            result = result.replace("{$KEY_PROMPT}", userPrompt)
-        }
-        if (keys.contains(KEY_MAIN_FILE)) {
-            result = result.replace("{$KEY_MAIN_FILE}", fileData?.content ?: "")
-        }
-        return result
+
+        return content
     }
 
     private data class ResponseData(

@@ -48,6 +48,10 @@ The following are additional bullet files that may be imported or referenced:
 # System
 Generate the rebulified code as a complete, standalone Bulified code file incorporating all requested modifications. Your response should consist only of the modified Bulified code content, without any additional comments or explanations outside of the Bulified code itself. This ensures the output can be directly used as a new Bulified code file.
 
+# System
+You are working on the below project, as provided by the user. Keep it in mind as you generate the response
+{project_details}
+
 # User
 Please rebulify the following file:
 

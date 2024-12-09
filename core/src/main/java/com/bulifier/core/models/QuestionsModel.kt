@@ -3,7 +3,7 @@ package com.bulifier.core.models
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.ui.utils.Question
 
-abstract class QuestionsModel(private val classGroup:String, val questions: List<Question>) {
+abstract class QuestionsModel(private val classGroup: String, val questions: List<Question>) {
 
     abstract val modelName: String
     abstract fun createApiModel(): ApiModel

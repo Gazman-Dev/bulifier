@@ -2,6 +2,7 @@ package com.bulifier.core.prefs
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.bulifier.core.db.Project
 import com.bulifier.core.prefs.Prefs.pref
 import com.google.gson.Gson
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -10,14 +11,23 @@ import kotlinx.coroutines.flow.StateFlow
 object Prefs {
     internal lateinit var pref: SharedPreferences
 
+    fun updateProject(project: Project) {
+        projectId.set(project.projectId)
+        projectName.set(project.projectName)
+        projectDetails.set(project.projectDetails ?: "")
+        path.set("")
+    }
+
     val projectId by lazy { PrefLongValue("projectId") }
     val projectName by lazy { PrefStringValue("project_v10") }
+    val projectDetails by lazy { PrefStringValue("project_details") }
     val path by lazy { PrefStringValue("path_v1") }
     val models by lazy { PrefListValue("models") }
 
     fun clear() {
         projectId.set(-1)
         projectName.set("")
+        projectDetails.set("")
         path.set("")
     }
 

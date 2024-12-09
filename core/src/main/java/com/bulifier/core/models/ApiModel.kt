@@ -4,7 +4,11 @@ import com.bulifier.core.api.MessageRequest
 import com.bulifier.core.db.HistoryItem
 
 interface ApiModel {
-    suspend fun sendMessage(request: MessageRequest, historyITem: HistoryItem, id: Long): ApiResponse
+    suspend fun sendMessage(
+        request: MessageRequest,
+        historyITem: HistoryItem,
+        id: Long
+    ): ApiResponse
 }
 
 data class ApiResponse(

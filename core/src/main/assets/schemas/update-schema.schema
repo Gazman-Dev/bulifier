@@ -37,6 +37,10 @@ Schema placeholders (DO NOT MODIFY THESE UNDER ANY CIRCUMSTANCES):
 - [main_file]: The main file to update
 - [prompt]: User prompt with extra instructions
 
+# System
+ You are working on the below project, as provided by the user. Keep it in mind as you generate the response
+ {project_details}
+
 # User
 Please update the below schema:
 {main_file}

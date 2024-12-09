@@ -6,7 +6,9 @@ import com.bulifier.core.models.api.AnthropicApiModel
 import com.bulifier.core.ui.utils.Question
 
 const val CLASS_GROUP_ANTHROPIC = "CLASS_GROUP_ANTHROPIC"
-class AnthropicQuestionsModel() : QuestionsModel(CLASS_GROUP_ANTHROPIC,
+
+class AnthropicQuestionsModel() : QuestionsModel(
+    CLASS_GROUP_ANTHROPIC,
     listOf(
         Question("Api Key", response = BuildConfig.CLAUDE_KEY),
         Question("Claude Model", response = "claude-3-5-sonnet-20240620", isPassword = false),

@@ -5,6 +5,7 @@ Turn your ideas into code using bullet points - right from your phone! Bulifier 
 [![Watch the Demo](https://img.shields.io/badge/Watch-Demo-red)](https://www.youtube.com/watch?v=Q0iQKEnIRtI&t=2s)
 [![Get it on Google Play](https://img.shields.io/badge/Get_it_on-Google_Play-green)](https://play.google.com/store/apps/details?id=com.bulifier)
 [![Visit Website](https://img.shields.io/badge/Visit-Website-blue)](https://bulifier.com)
+[![Release Notes](https://img.shields.io/badge/Release-Notes-orange)](RELEASE_NOTES.md)
 
 ## What Makes Bulifier Special? ✨
 
@@ -60,7 +61,3 @@ We're using Firebase as a backend proxy for AI requests (OpenAI doesn't allow pu
 Bulifier is released under the Apache License 2.0 by Gazman Dev LLC.
 
 We use a modified version of JGit (under the Eclipse Distribution License 1.0). Check out the [JGit project](https://www.eclipse.org/jgit/) for more details.
-
----
-
-[Release Notes](RELEASE_NOTES.md)

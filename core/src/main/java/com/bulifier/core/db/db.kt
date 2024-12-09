@@ -34,7 +34,7 @@ private fun getDatabase(context: Context): AppDatabase {
             .addTypeConverter(DateTypeConverter())
             .addTypeConverter(SetConverter())
             .addTypeConverter(LongListConverter())
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
             .build()
         INSTANCE = instance
         instance
@@ -114,10 +114,12 @@ interface HistoryDao {
         projectId: Long
     ): Flow<List<HistoryItem>>
 
-    @Query("""update history set status = 'SUBMITTED' where 
+    @Query(
+        """update history set status = 'SUBMITTED' where 
         prompt_id in (:ids) and 
         ((status = 'PROCESSING' and progress = -1) or (progress < 1 and progress != -1))
-    """)
+    """
+    )
     suspend fun updateHistoryStatus(
         ids: List<Long>
     )
@@ -150,8 +152,9 @@ interface HistoryDao {
     suspend fun markError(promptId: Long, errorMessage: String)
 
     data class ErrorData(val promptId: Long, val errorMessage: String)
+
     @Transaction
-    suspend fun markErrors(errors: List<ErrorData>){
+    suspend fun markErrors(errors: List<ErrorData>) {
         errors.forEach {
             markError(it.promptId, it.errorMessage)
         }
@@ -186,13 +189,11 @@ interface FileDao {
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
 
     @Query("SELECT * FROM files WHERE path = :path AND file_name like '%' || :extension AND project_id = :projectId")
-    suspend fun fetchFilesListByPathAndProjectId(path: String, extension: String, projectId: Long): List<File>
-
-    @Query("SELECT contents.* FROM files join contents on files.file_id = contents.file_id WHERE project_id = :projectId and contents.type = :type")
-    fun fetchFilesListByProjectIdAndType(
-        projectId: Long,
-        type: String = Type.RAW.toString()
-    ): List<Content>
+    suspend fun fetchFilesListByPathAndProjectId(
+        path: String,
+        extension: String,
+        projectId: Long
+    ): List<File>
 
     @Query(
         """SELECT 
@@ -208,6 +209,7 @@ interface FileDao {
         path: String,
         projectId: Long
     ): List<FileData>
+
 
     @Query(
         """SELECT 
@@ -486,9 +488,14 @@ interface FileDao {
 
     @Query(
         """
-        SELECT files.file_id, files.file_name, files.path, files.is_file, contents.content, contents.type
+        SELECT 
+            files.file_id, 
+            files.file_name, 
+            files.path, 
+            files.is_file, 
+            contents.*
         FROM files
-        JOIN contents ON files.file_id = contents.file_id
+            JOIN contents ON files.file_id = contents.file_id
         WHERE files.project_id = :projectId
         ORDER BY files.file_id ASC
     """
@@ -512,6 +519,9 @@ interface FileDao {
 
     @Query("SELECT * FROM projects WHERE project_name = :projectName")
     suspend fun getProject(projectName: String): Project?
+
+    @Update
+    suspend fun updateProject(project: Project)
 
     @Query("SELECT count(*) > 0 FROM projects WHERE project_name = :projectName")
     suspend fun isProjectExists(projectName: String): Boolean

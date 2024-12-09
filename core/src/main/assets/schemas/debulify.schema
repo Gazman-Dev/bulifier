@@ -46,6 +46,10 @@ The following are additional bullet files that may be imported or referenced:
 # System
 Generate the debulified code as a single, compilable file in the target programming language specified by the user. Your response should consist only of the code content, without any additional comments or explanations outside of the code itself. This ensures the output can be directly saved and compiled.
 
+# System
+ You are working on the below project, as provided by the user. Keep it in mind as you generate the response
+ {project_details}
+
 # User
 {prompt}
 

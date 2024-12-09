@@ -7,5 +7,6 @@
     <color name="colorPrimaryDark">#44356A</color>
     <color name="colorAccent">#8019B8</color>
     <color name="folder_color">#000000</color>
+    <color name="buly_background_color">#FFFFFF</color>
 
 </resources>
