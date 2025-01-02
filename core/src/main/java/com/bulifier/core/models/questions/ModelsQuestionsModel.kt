@@ -1,7 +1,7 @@
 package com.bulifier.core.models.questions
 
 import androidx.annotation.Keep
-import com.bulifier.core.api.MessageRequest
+import com.bulifier.core.ai.MessageRequest
 import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.models.ApiModel
 import com.bulifier.core.models.ApiResponse
@@ -16,7 +16,8 @@ class ModelsQuestionsModel @Inject constructor() : QuestionsModel(CLASS_GROUP_MO
         Question(title = "What model to create?",
             options = listOf(
                 Model.OpenAI,
-                Model.Claude
+                Model.Claude,
+                Model.Debug
             ).map {
                 it.modelName
             }
@@ -39,6 +40,7 @@ class ModelsQuestionsModel @Inject constructor() : QuestionsModel(CLASS_GROUP_MO
         ModelModels("ModelModel"),
         OpenAI("OpenAI"),
         Claude("Claude"),
+        Debug("Echo(Debug)"),
         Error("Error");
 
         companion object {
@@ -52,6 +54,7 @@ class ModelsQuestionsModel @Inject constructor() : QuestionsModel(CLASS_GROUP_MO
             return when (model) {
                 Model.Claude -> AnthropicQuestionsModel()
                 Model.OpenAI -> OpenAiQuestionsModel()
+                Model.Debug -> DebugQuestionsModel()
                 else -> null
             }
         }

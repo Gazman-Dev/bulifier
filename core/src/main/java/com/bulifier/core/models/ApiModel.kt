@@ -1,6 +1,6 @@
 package com.bulifier.core.models
 
-import com.bulifier.core.api.MessageRequest
+import com.bulifier.core.ai.MessageRequest
 import com.bulifier.core.db.HistoryItem
 
 interface ApiModel {

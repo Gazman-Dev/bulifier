@@ -1,13 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.bulifier.core.ui.content.ScrollableEditText xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/content"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    xmlns:tools="http://schemas.android.com/tools">
-
-    <TextView
-        android:id="@+id/content"
-        tools:text="Hello World"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
-
-</ScrollView>
+    android:padding="2dp"
+    tools:text="Hello World" />

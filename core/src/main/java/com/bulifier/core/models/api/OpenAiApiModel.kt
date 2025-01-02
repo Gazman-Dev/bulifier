@@ -7,7 +7,7 @@ import com.aallam.openai.api.chat.ChatRole
 import com.aallam.openai.api.http.Timeout
 import com.aallam.openai.api.model.ModelId
 import com.aallam.openai.client.OpenAI
-import com.bulifier.core.api.MessageRequest
+import com.bulifier.core.ai.MessageRequest
 import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.models.ApiModel
 import com.bulifier.core.models.ApiResponse

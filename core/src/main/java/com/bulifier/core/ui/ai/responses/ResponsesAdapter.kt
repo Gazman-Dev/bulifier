@@ -10,14 +10,17 @@ class ResponsesAdapter(val responses: List<ResponseItem>) :
     RecyclerView.Adapter<ResponsesAdapter.ResponsesViewHolder>() {
 
     class ResponsesViewHolder(val binding: ResponseItemBinding) :
-        RecyclerView.ViewHolder(binding.root) {
+        RecyclerView.ViewHolder(binding.content) {
         fun bind(content: String) {
-            binding.content.text = content
+            binding.content.setText(content)
         }
     }
 
     override fun onCreateViewHolder(parent: ViewGroup, viewType: Int) = ResponsesViewHolder(
-        ResponseItemBinding.inflate(LayoutInflater.from(parent.context), parent, false)
+        ResponseItemBinding.inflate(LayoutInflater.from(parent.context), parent, false).apply {
+            content.setIsWrapped(true)
+            content.isEditable = false
+        }
     )
 
     override fun onBindViewHolder(holder: ResponsesViewHolder, position: Int) {

@@ -1,8 +1,11 @@
 package com.bulifier.core.ui.utils
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.view.View
 import android.view.inputmethod.InputMethodManager
+import androidx.core.animation.doOnEnd
+import com.bulifier.core.R
 
 fun View.hideKeyboard() {
     val inputMethodManager =
@@ -10,12 +13,12 @@ fun View.hideKeyboard() {
     inputMethodManager.hideSoftInputFromWindow(windowToken, 0)
 }
 
-fun <A : Any?, B : Any?> letAll(a: A?, b: B?, block: (A, B) -> Unit) {
+fun <A : Any?, B : Any?, C : Any?> letAll(a: A?, b: B?, block: (A, B) -> C) : C? {
     if (a == null || b == null) {
-        return
+        return null
     }
 
-    block(a, b)
+    return block(a, b)
 }
 
 fun <A : Any?, B : Any?, C : Any?> letAll(a: A?, b: B?, c: C?, block: (A, B, C) -> Unit) {
@@ -38,4 +41,8 @@ fun <A : Any?, B : Any?, C : Any?, D : Any?> letAll(
     }
 
     block(a, b, c, d)
+}
+
+fun dpToPx(dp: Float, context: Context): Int {
+    return (dp * context.resources.displayMetrics.density).toInt()
 }

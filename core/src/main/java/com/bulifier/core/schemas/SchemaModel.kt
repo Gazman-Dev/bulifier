@@ -5,6 +5,7 @@ import androidx.annotation.VisibleForTesting
 import com.bulifier.core.db.AppDatabase
 import com.bulifier.core.db.Content
 import com.bulifier.core.db.File
+import com.bulifier.core.db.ProcessingMode
 import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaSettings
 import com.bulifier.core.db.SchemaType
@@ -22,14 +23,26 @@ object SchemaModel {
     const val KEY_CONTEXT = "context"
     const val KEY_PROMPT = "prompt"
     const val KEY_MAIN_FILE = "main_file"
-    const val PROJECT_DETAILS = "project_details"
+    const val KEY_MAIN_FILE_NAME = "main_file_name"
+    const val KEY_PROJECT_DETAILS = "project_details"
+    const val KEY_SCHEMAS = "schemas"
+    const val KEY_FOLDER_NAME = "folder_name"
+    const val KEY_FILES = "files"
+    const val KEY_PROJECT_NAME = "project_name"
+    const val KEY_BULLET_RAW_FILE_PAIR = "bullet_raw_file_pair"
 
     private val keys = setOf(
         KEY_PACKAGE,
         KEY_CONTEXT,
         KEY_PROMPT,
         KEY_MAIN_FILE,
-        PROJECT_DETAILS
+        KEY_MAIN_FILE_NAME,
+        KEY_PROJECT_DETAILS,
+        KEY_SCHEMAS,
+        KEY_FOLDER_NAME,
+        KEY_FILES,
+        KEY_PROJECT_NAME,
+        KEY_BULLET_RAW_FILE_PAIR
     )
 
     private val job = Job()
@@ -100,7 +113,7 @@ object SchemaModel {
                     }
 
 
-                    db.fileDao().insertContentAndUpdateFileSize(
+                    db.fileDao().insertContentAndUpdateFileMetaData(
                         Content(
                             fileId = fileId,
                             content = schemaData
@@ -120,17 +133,28 @@ object SchemaModel {
             }.run {
                 val schemas = flatten()
                 val settings = schemas.filter { it.type == SchemaType.SETTINGS }.map {
-                    val map = it.content.split("\n").associate { line ->
-                        val values = line.substring(" - ".length - 1).lowercase().split(":")
-                        values[0].trim() to values[1].trim()
+                    val map = it.content.split("\n").filter {
+                        it.trim().isNotEmpty()
+                    }.associate { line ->
+                        try {
+                            val values = line.substring(" - ".length - 1).lowercase().split(":")
+                            values[0].trim() to values[1].trim()
+                        }
+                        catch (e: Exception) {
+                            throw Error("Error parsing settings schema: $line", e)
+                        }
                     }
                     SchemaSettings(
                         schemaName = it.schemaName,
-                        outputExtension = map["output extension"] ?: "txt",
                         inputExtension = map["input extension"] ?: "bul",
-                        runForEachFile = map["run for each file"] == "true",
+                        processingMode = map["processing mode"]?.let {
+                            ProcessingMode.fromString(it)
+                        }?: ProcessingMode.SINGLE,
                         multiFilesOutput = map["multi files output"] == "true",
                         overrideFiles = map["override files"] == "true",
+                        visibleForAgent = map["visible for agent"] == "true",
+                        isAgent = map["agent"] == "true",
+                        purpose = map["purpose"] ?: "TBA",
                         projectId = projectId
                     )
                 }
@@ -143,8 +167,11 @@ object SchemaModel {
     suspend fun getSchemaNames() =
         db.schemaDao().getSchemaNames(projectId = Prefs.projectId.flow.value)
 
+    suspend fun getSchemaPurposes() =
+        db.schemaDao().getSchemaPurposes(projectId = Prefs.projectId.flow.value)
+
     private fun parseSchema(content: String, schemaName: String, projectId: Long): List<Schema> {
-        val pattern = """#(\s*)[0-9a-zA-Z_\-]+""".toRegex()
+        val pattern = """^\s*#\s*[0-9a-zA-Z_\-]+""".toRegex(RegexOption.MULTILINE)
 
         // Find all matches of the pattern
         val matches = pattern.findAll(content)
@@ -154,8 +181,8 @@ object SchemaModel {
         val headers = mutableListOf<String>()
         var lastIndex = 0
         for (match in matches) {
-            val value = match.value
-            headers.add(value.substring(1).trim())
+            val value = match.value.trim()
+            headers.add(value.substring(1))
             val section = content.substring(lastIndex, match.range.first).trim()
             if (section.isNotEmpty()) {
                 sections.add(section)
@@ -191,7 +218,7 @@ object SchemaModel {
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     fun extractKeys(input: String): Set<String> {
         // Regex pattern to find {key} - it looks for anything enclosed in {}
-        val pattern = """\{(\w+)\}""".toRegex()
+        val pattern = """⟪(\w+)⟫""".toRegex()
         // Finds all matches, maps them to keep only the content without braces, and collects them into a set to avoid duplicates
         val results = pattern.findAll(input)
         return results.map {

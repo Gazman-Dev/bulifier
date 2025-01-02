@@ -1,63 +1,105 @@
-# Welcome to Bulifier! 👋
+# Welcome to Bulifier
 
-Turn your ideas into code using bullet points - right from your phone! Bulifier is an AI-powered app that makes software development feel more natural and accessible.
+[![Watch the Demo](https://img.shields.io/badge/Watch-Demo-red)](https://www.youtube.com/watch?v=Q0iQKEnIRtI&t=2s)  
+[![Get it on Google Play](https://img.shields.io/badge/Get_it_on-Google_Play-green)](https://play.google.com/store/apps/details?id=com.bulifier)  
+[![Visit Website](https://img.shields.io/badge/Visit-Website-blue)](https://bulifier.com/)  
+[![Release Notes](https://img.shields.io/badge/Release-Notes-orange)](https://chatgpt.com/c/RELEASE_NOTES.md)
 
-[![Watch the Demo](https://img.shields.io/badge/Watch-Demo-red)](https://www.youtube.com/watch?v=Q0iQKEnIRtI&t=2s)
-[![Get it on Google Play](https://img.shields.io/badge/Get_it_on-Google_Play-green)](https://play.google.com/store/apps/details?id=com.bulifier)
-[![Visit Website](https://img.shields.io/badge/Visit-Website-blue)](https://bulifier.com)
-[![Release Notes](https://img.shields.io/badge/Release-Notes-orange)](RELEASE_NOTES.md)
+Bulifier is an **open-source**, **AI-powered mobile IDE** that shifts software development into a **bullet-point-driven workflow**:
 
-## What Makes Bulifier Special? ✨
+1.  **Mobile-First Coding** – Seamlessly build, edit, and commit to your projects directly from a phone or tablet.
+2.  **Bullet Points as a Language** – Represent and refine your application’s logic as bullet points. The AI then generates and updates the raw source code under the hood.
 
-Ever wished you could code from your phone as easily as writing notes? That's exactly what we've built! Bulifier transforms the way you develop software by letting you express your ideas in simple bullet points. Our AI then turns those bullets into proper code.
+## Why Bullet Points?
 
-Here's what you can do:
-- **Bulify** - Write your ideas as bullet points (way more fun than it sounds!)
-- **Debulify** - Watch as your bullets transform into Python, Java, or whatever you need
-- **Rebulify** - Need to update your code? Just modify your bullets and regenerate
-- **Schema Magic** - Create custom templates for different types of projects
-- **Git Integration** - Manage your code repositories right from your phone
+Bulifier is about **changing your perspective** on how you interact with code. You can capture the essence of your application in concise bullet points, making it easier for everyone—including AI—to read, reason, and refine, ensuring your project remains aligned with your goals.
 
-## Ready to Try It? 🚀
+----------
 
-1. Grab it from the [Google Play Store](https://play.google.com/store/apps/details?id=com.bulifier)
-2. Or build it yourself:
-    - Clone this repo
-    - Open in Android Studio
-    - Run the demo module
-    - Start bulifying!
+## Key Features
 
-## Cool Features You'll Love 💡
+1.  **Mobile IDE**
 
-### Git Support
-We've baked in Git support so you can manage your code right from the app:
-- Clone repositories
-- Pull and push changes
-- Switch between branches and tags
-- Commit your work
-- Reset when things go wrong
+    -   Develop on-the-go with robust Git integration (clone, pull, push, commit, etc.).
+    -   Write and maintain your application logic without needing a full desktop environment.
+2.  **Bullet-Point Development**
 
-(Just a heads up - we don't handle merge conflicts yet!)
+    -   Outline your ideas in natural-language bullet points.
+    -   Let the AI take care of creating or updating the underlying source code.
+3.  **Agentic Flow**
 
-### Make It Your Own
-Bulifier is super flexible. You can:
-- Create custom schemas for different types of projects
-- Update existing schemas to match your style
-- Use it for more than just code - try writing docs or books!
+    -   Invoke the **Agent** to execute multiple commands in a single operation.
+    -   Whether you’re adding a new feature, reorganizing project structure, or refining logic, the Agent selects the best schemas and context automatically.
+4.  **Sync**
 
-## Let's Make Bulifier Better Together 🤝
+    -   **Two Sync Actions**:
+        -   Generate or update **raw code** from bullet points.
+        -   Update **bullet points** based on the current raw code.
+    -   Sync only the components you’ve changed, or apply a broader update to everything.
 
-We built Bulifier because we believe coding shouldn't be limited to laptops and desktops. If you're excited about this vision, we'd love your help! Feel free to:
-- Submit pull requests for small improvements
-- Open issues to discuss bigger changes
-- Share your ideas and feedback
+----------
 
-## Technical Notes 🔧
+## The Play Store Version
 
-We're using Firebase as a backend proxy for AI requests (OpenAI doesn't allow public API keys). Don't worry though - all the business logic is client side and part of this repo!
+You can also experience Bulifier as a ready-to-use app from the Google Play Store. This version uses a **Firebase Real-time Database** as an AI proxy, providing:
 
-## License 📜
+-   **Excellent Offline Support** – Keep working even when you’re offline.
+-   **Faster Parallel Execution** – Especially noticeable when using the Agentic Flow.
+-   **All Open-Source Business Logic** – Everything critical remains open source here in this repository.
 
-Bulifier is released under the Apache License 2.0 by Gazman Dev LLC.
+If you prefer a more direct approach or want to experiment with your own keys, you can stick to the open-source version in this repo. Either way, all of Bulifier’s core features are at your fingertips.
 
-We use a modified version of JGit (under the Eclipse Distribution License 1.0). Check out the [JGit project](https://www.eclipse.org/jgit/) for more details.
+----------
+
+## Getting Started
+
+1.  **Install from the [Google Play Store](https://play.google.com/store/apps/details?id=com.bulifier).**
+2.  **Or build from this repo**:
+    -   Clone the project
+    -   Open in Android Studio
+    -   Run the demo module
+    -   Start exploring Bulifier
+
+----------
+
+## Technical Details
+
+-   **AI Requests**
+    -   **Open Source**: Direct API calls with your own keys (e.g., GPT, Claude).
+    -   **Play Store**: Via Firebase Real-time Database as a backend proxy to safeguard keys.
+-   **Bullet-Point to Code** – The bullet-point layer is your main interface; Bulifier handles the conversions to raw files automatically.
+-   **Open Source & Licensing** – Bulifier is published under the Apache License 2.0. It uses a modified version of JGit under the Eclipse Distribution License 1.0.
+-  **Schemas**
+   Schemas are the prompt engineering, it powers the agent and allows you to call them manually. You can also create new schemas or update the existing one.
+    -   **`update-bullet-with-raw`**  
+        Uses your existing raw files to update the corresponding bullet points. This way, if code is changed manually or elsewhere, your bullet-point representation stays accurate.
+
+    -   **`update-raw-with-bullet`**  
+        Converts or updates raw files based on the latest bullet points. Ideal for generating new files or merging new logic back into existing code.
+
+    -   **`debulify-file`**  
+        Translates bullet points into code at the file level. Perfect for situations where you only want to convert (or reconvert) specific sections or modules of your project.
+
+    -   **`rebulify-file`**  
+        Adjusts bullet points by reading the current state of a file’s code, ensuring your high-level outline matches the latest version of that file.
+
+----------
+
+## Contributing
+
+We welcome feedback and contributions:
+
+-   Submit issues for bugs or feature requests
+-   Open pull requests to enhance the platform or fix problems
+
+----------
+
+## License
+
+Licensed under the **Apache License 2.0** by **Gazman Dev LLC**.
+
+Includes a modified version of **JGit** (under the Eclipse Distribution License 1.0). For more details, see the [Eclipse JGit project](https://www.eclipse.org/jgit/).
+
+----------
+
+**Thanks for checking out Bulifier!** We aim to offer a _fresh, AI-centric perspective_ on coding—one that feels natural for developers and fosters collaboration, all while being fully accessible on mobile devices. Your feedback and ideas are always welcome.

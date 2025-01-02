@@ -25,6 +25,6 @@
         android:layout_height="50dp"
         android:adjustViewBounds="true"
         android:src="@drawable/baseline_delete_forever_24"
-        app:tint="@color/black" />
+        app:tint="@color/folder_color" />
 
 </LinearLayout>

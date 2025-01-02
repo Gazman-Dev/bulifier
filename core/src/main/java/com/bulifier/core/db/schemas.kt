@@ -1,5 +1,6 @@
 package com.bulifier.core.db
 
+import androidx.annotation.Keep
 import androidx.room.ColumnInfo
 import androidx.room.Database
 import androidx.room.Entity
@@ -22,7 +23,8 @@ import java.util.Date
         HistoryItem::class,
         Schema::class,
         ResponseItem::class,
-        SchemaSettings::class
+        SchemaSettings::class,
+        SyncFile::class
     ], version = DB_VERSION
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +33,8 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun historyDao(): HistoryDao
 
     abstract fun schemaDao(): SchemaDao
+
+    abstract fun syncDao(): SyncDao
 }
 
 @ProvidedTypeConverter
@@ -157,14 +161,17 @@ data class SchemaSettings(
     @ColumnInfo(name = "schema_name")
     val schemaName: String,
 
-    @ColumnInfo(name = "output_extension")
-    val outputExtension: String = "txt",
+    @ColumnInfo(name = "purpose")
+    val purpose: String,
+
+    @ColumnInfo(name = "visible_for_agent")
+    val visibleForAgent: Boolean = false,
 
     @ColumnInfo(name = "input_extension")
     val inputExtension: String = "bul",
 
-    @ColumnInfo(name = "run_for_each_file")
-    val runForEachFile: Boolean = false,
+    @ColumnInfo(name = "processing_mode")
+    val processingMode: ProcessingMode = ProcessingMode.SINGLE,
 
     @ColumnInfo(name = "multi_files_output")
     val multiFilesOutput: Boolean = false,
@@ -172,9 +179,30 @@ data class SchemaSettings(
     @ColumnInfo(name = "override_files")
     val overrideFiles: Boolean = false,
 
+    @ColumnInfo(name = "agent")
+    val isAgent: Boolean = false,
+
     @ColumnInfo(name = "project_id")
     val projectId: Long,
 )
+
+@Keep
+enum class ProcessingMode {
+    PER_FILE,        // Process each file individually
+    SINGLE,          // Process all files together
+    SYNC_BULLETS,    // Update bullet point files with corresponding raw files
+    SYNC_RAW;        // Update raw files with corresponding bullet point files
+
+    companion object {
+        fun fromString(value: String) = when (value.lowercase().trim()) {
+            "per_file" -> PER_FILE
+            "single" -> SINGLE
+            "sync_bullets" -> SYNC_BULLETS
+            "sync_raw" -> SYNC_RAW
+            else -> throw IllegalArgumentException("Invalid processing mode: $value")
+        }
+    }
+}
 
 enum class SchemaType {
     SYSTEM,
@@ -204,11 +232,14 @@ enum class SchemaType {
         onDelete = ForeignKey.CASCADE
     )],
     indices = [
-        Index(value = ["path", "project_id"]),
+        Index(value = ["to_delete", "path", "project_id"]),
         Index(
             value = ["path", "file_name", "project_id"],
             unique = true
-        ), Index(value = ["project_id"])],
+        ),
+        Index(value = ["project_id"]),
+        Index(value = ["project_id", "to_delete"])
+    ],
 )
 data class File(
 
@@ -230,6 +261,15 @@ data class File(
 
     @ColumnInfo(name = "size")
     val size: Int = 0,
+
+    @ColumnInfo(name = "hash")
+    val hash: Long = -1,
+
+    @ColumnInfo(name = "sync_hash")
+    val syncHash: Long = -1,
+
+    @ColumnInfo(name = "to_delete")
+    val delete: Boolean = false,
 )
 
 @Entity(
@@ -296,7 +336,7 @@ data class HistoryItem(
     val contextFiles: List<Long> = emptyList(),
 
     @ColumnInfo(name = "schema")
-    val schema: String = SCHEMA_BULLIFY,
+    val schema: String,
 
     @ColumnInfo(name = "path")
     val path: String,
@@ -314,10 +354,10 @@ data class HistoryItem(
     var lastUpdated: Date = Date()
 
     companion object {
-        const val SCHEMA_BULLIFY = "bulify"
-        const val UPDATE_SCHEMA = "update-schema"
-        const val SCHEMA_DEBULIFY = "debulify"
-        const val SCHEMA_REBULIFY_FILE = "rebulify-file"
+        const val SCHEMA_AGENT = "agent"
+        const val SCHEMA_UPDATE_RAW_WITH_BULLETS = "update-raw-with-bullet"
+        const val SCHEMA_DEBULIFY_FILE = "debulify-file"
+        const val SCHEMA_UPDATE_BULLET_WITH_RAW = "update-bullet-with-raw"
     }
 }
 
@@ -347,6 +387,40 @@ data class ResponseItem(
 
     @ColumnInfo(name = "request")
     val request: String
+) {
+    @ColumnInfo(name = "last_updated")
+    var lastUpdated: Date = Date()
+}
+
+@Entity(
+    tableName = "sync_files",
+    foreignKeys = [ForeignKey(
+        entity = Project::class,
+        parentColumns = arrayOf("project_id"),
+        childColumns = arrayOf("project_id"),
+        onDelete = ForeignKey.CASCADE
+    )], indices = [Index(value = ["project_id", "schema"])]
+)
+@TypeConverters(DateTypeConverter::class)
+data class SyncFile(
+    @PrimaryKey(autoGenerate = true)
+    @ColumnInfo(name = "id")
+    val id: Long = 0,
+
+    @ColumnInfo(name = "file_id")
+    val fileId: Long?,
+
+    @ColumnInfo(name = "raw_file_id")
+    val rawFileId: Long?,
+
+    @ColumnInfo(name = "bullets_file_id")
+    val bulletsFileId: Long,
+
+    @ColumnInfo(name = "schema")
+    val schema: String,
+
+    @ColumnInfo(name = "project_id")
+    val projectId: Long,
 ) {
     @ColumnInfo(name = "last_updated")
     var lastUpdated: Date = Date()

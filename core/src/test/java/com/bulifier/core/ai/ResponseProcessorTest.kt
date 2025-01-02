@@ -1,4 +1,4 @@
-package com.bulifier.core.api
+package com.bulifier.core.ai
 
 import org.junit.Assert.*
 import org.junit.Test

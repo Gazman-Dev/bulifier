@@ -87,6 +87,7 @@ dependencies {
     implementation('com.squareup.retrofit2:converter-gson:2.11.0')
     implementation "androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.7"
     implementation "androidx.lifecycle:lifecycle-extensions:2.2.0"
+    implementation "androidx.work:work-runtime-ktx:2.10.0"
 
     implementation "com.google.dagger:hilt-android:2.52"
     kapt "com.google.dagger:hilt-android-compiler:2.52"
@@ -106,8 +107,8 @@ dependencies {
     kapt "androidx.room:room-compiler:$room_version"
     annotationProcessor "androidx.room:room-compiler:$room_version"
 
-    implementation "androidx.paging:paging-runtime-ktx:3.3.4"
-    implementation "androidx.paging:paging-common-ktx:3.3.4"
+    implementation "androidx.paging:paging-runtime-ktx:3.3.5"
+    implementation "androidx.paging:paging-common-ktx:3.3.5"
 
     implementation 'androidx.fragment:fragment-ktx:1.8.5'
 

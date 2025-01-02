@@ -38,7 +38,8 @@ abstract class QuestionsModel(private val classGroup: String, val questions: Lis
             val classGroup = Prefs.get("class_group $modelName")
                 ?: throw Error("No class group found for $modelName")
 
-            val klass = modelClasses[classGroup] ?: throw Error("Model $classGroup class not found")
+            val klass = modelClasses[classGroup]
+                ?: throw Error("Model $classGroup class not found, it must be registered in the Setup class")
             val constructor = klass.declaredConstructors.firstOrNull {
                 it.parameterCount == 0
             } ?: throw Error("No suitable constructor found for $classGroup")

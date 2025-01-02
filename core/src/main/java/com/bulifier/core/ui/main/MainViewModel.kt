@@ -13,11 +13,14 @@ import com.bulifier.core.db.File
 import com.bulifier.core.db.FileData
 import com.bulifier.core.db.Project
 import com.bulifier.core.db.db
+import com.bulifier.core.prefs.PrefBooleanValue
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.path
 import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
 import com.bulifier.core.schemas.SchemaModel
+import com.bulifier.core.ui.main.actions.deleteAction
+import com.bulifier.core.ui.main.actions.moveAction
 import com.bulifier.core.ui.utils.copyToClipboard
 import com.bulifier.core.utils.Logger
 import kotlinx.coroutines.Dispatchers
@@ -45,6 +48,9 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     private val _openedFile = MutableStateFlow<FileInfo?>(null)
     private val _fileContent = MutableStateFlow("")
     private val _fullPath = MutableStateFlow(FullPath(null, ""))
+    val fullScreenMode = MutableStateFlow(false)
+
+    val wrapping = PrefBooleanValue("text wrapping")
 
     val openedFile: StateFlow<FileInfo?> = _openedFile
     val fileContent: StateFlow<String> = _fileContent
@@ -94,24 +100,18 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
 
         viewModelScope.launch {
-            combine(path.flow, _openedFile) { pathValue, fileInfo ->
-                FullPath(fileInfo?.fileName, extractPath(pathValue))
+            combine(path.flow, _openedFile, projectName.flow) { pathValue, fileInfo, projectNameValue ->
+                val fullPath = if (pathValue.isNotBlank()) {
+                    "/$pathValue"
+                } else {
+                    ""
+                }
+                FullPath(fileInfo?.fileName, "$projectNameValue$fullPath")
             }.collectLatest { newFullPath ->
                 logger.d("Full path updated to $newFullPath")
                 _fullPath.value = newFullPath
             }
         }
-    }
-
-    private fun extractPath(value: String?): String {
-        val path = if (!value.isNullOrBlank()) {
-            "/$value"
-        } else {
-            ""
-        }
-        val fullPath = "${projectName.flow.value}$path"
-        logger.d("Extracted path: $fullPath")
-        return fullPath
     }
 
     fun openFile(file: File) {
@@ -222,7 +222,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         val openedFile = _openedFile.value ?: return
         viewModelScope.launch {
             logger.d("Updating content for fileId: ${openedFile.fileId}")
-            db.insertContentAndUpdateFileSize(
+            db.insertContentAndUpdateFileMetaData(
                 Content(
                     fileId = openedFile.fileId,
                     content = content
@@ -237,24 +237,10 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         logger.d("Project deleted: ${project.projectId}")
     }
 
-    fun renameFile(file: File, newFileNameOrPath: String) = try {
+    fun moveFile(file: File, newFileNameOrPath: String) = try {
         logger.i("renameFile")
         viewModelScope.launch {
-            if (file.isFile) {
-                val newPath = if (newFileNameOrPath.trim().startsWith("/")) {
-                    newFileNameOrPath.substring(1)
-                } else {
-                    newFileNameOrPath.trim()
-                }
-
-                val newFileName = newPath.substringAfterLast('/')
-                val newFilePath = newPath.substringBeforeLast('/')
-                db.updateFileName(file.copy(fileName = newFileName, path = newFilePath))
-                logger.d("File renamed to: $newFileName at path: $newFilePath")
-            } else {
-                db.updateFolderName(file, newFileNameOrPath)
-                logger.d("Folder renamed to: $newFileNameOrPath")
-            }
+            moveAction(file, newFileNameOrPath, db, logger)
         }
         true
     } catch (e: Exception) {
@@ -265,13 +251,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     fun deleteFile(file: File) {
         logger.i("deleteFile")
         viewModelScope.launch {
-            if (file.isFile) {
-                db.deleteFile(file.fileId)
-                logger.d("File deleted: ${file.fileId}")
-            } else {
-                db.deleteFolder(file.fileId, file.path + "/" + file.fileName)
-                logger.d("Folder deleted: ${file.fileName}")
-            }
+            deleteAction(file, db, logger)
         }
     }
 

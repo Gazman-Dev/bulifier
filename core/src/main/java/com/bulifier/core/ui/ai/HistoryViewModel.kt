@@ -2,6 +2,7 @@ package com.bulifier.core.ui.ai
 
 import android.app.Application
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -11,25 +12,34 @@ import androidx.paging.cachedIn
 import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.db.HistoryItemWithSelection
 import com.bulifier.core.db.HistoryStatus
+import com.bulifier.core.db.SyncMode
 import com.bulifier.core.db.db
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.projectId
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 
 class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
     private val detailedItem = MutableStateFlow<HistoryItem?>(null)
 
-    private val historyDb by lazy { app.db.historyDao() }
-    private val filesDb by lazy { app.db.fileDao() }
+    private val db by lazy { app.db }
 
     private var pagingJob: Job? = null
 
     val selectedSchema: String?
         get() = detailedItem.value?.schema
+
+    @OptIn(ExperimentalCoroutinesApi::class)
+    val progress by lazy {
+        projectId.flow.flatMapLatest {
+            db.historyDao().getProgress(it)
+        }
+    }
 
     private val _historySource =
         MutableStateFlow<PagingData<HistoryItemWithSelection>>(PagingData.empty())
@@ -52,7 +62,8 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
             Log.d(
                 "HistoryViewModel",
                 "promptId=$promptId, projectId=$projectId model= ${this@HistoryViewModel}\n" +
-                        historyDb.getHistoryDebug(promptId ?: -1, projectId)
+                        this@HistoryViewModel.db.historyDao()
+                            .getHistoryDebug(promptId ?: -1, projectId)
                             .joinToString("\n") {
                                 "promptId=${it.historyItem.promptId}, projectId=${it.historyItem.projectId} selected=${it.selected}"
                             }
@@ -61,7 +72,7 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
             Pager(
                 config = PagingConfig(pageSize = 20),
                 pagingSourceFactory = {
-                    historyDb.getHistory(promptId ?: -1, projectId)
+                    this@HistoryViewModel.db.historyDao().getHistory(promptId ?: -1, projectId)
                 }
             ).flow.cachedIn(viewModelScope).collect {
                 _historySource.value = it
@@ -71,18 +82,18 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun deleteHistoryItem(historyItem: HistoryItem) {
         viewModelScope.launch {
-            historyDb.deleteHistoryItem(historyItem)
+            this@HistoryViewModel.db.historyDao().deleteHistoryItem(historyItem)
         }
     }
 
-    suspend fun getResponses(promptId: Long) = historyDb.getResponses(promptId)
-    suspend fun getErrorMessages(promptId: Long) = historyDb.getErrorMessages(promptId)
+    suspend fun getResponses(promptId: Long) = db.historyDao().getResponses(promptId)
+    suspend fun getErrorMessages(promptId: Long) = db.historyDao().getErrorMessages(promptId)
 
     fun discard() {
         Log.d("HistoryViewModel", "discard: ${detailedItem.value}")
         viewModelScope.launch {
             detailedItem.value?.let {
-                historyDb.deleteHistoryItem(it)
+                this@HistoryViewModel.db.historyDao().deleteHistoryItem(it)
                 detailedItem.value = null
             }
         }
@@ -92,7 +103,7 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
         Log.d("HistoryViewModel", "saveToDraft: ${detailedItem.value}")
         viewModelScope.launch {
             detailedItem.value?.let {
-                historyDb.updateHistory(it)
+                this@HistoryViewModel.db.historyDao().updateHistory(it)
             }
             detailedItem.emit(null)
         }
@@ -104,7 +115,8 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
         detailedItem.value?.let { historyItem ->
             detailedItem.value = historyItem.copy(modelId = model)
             viewModelScope.launch {
-                historyDb.updateHistory(historyItem.copy(modelId = model))
+                this@HistoryViewModel.db.historyDao()
+                    .updateHistory(historyItem.copy(modelId = model))
             }
         }
     }
@@ -118,30 +130,25 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
         Log.d("HistoryViewModel", "createNewAiJob: $pathWithProjectName, $fileName")
         val path = dropProjectName(pathWithProjectName)
         viewModelScope.launch {
-            val schema = when {
-                fileName != null -> HistoryItem.SCHEMA_REBULIFY_FILE
-                path == "schemas" -> HistoryItem.UPDATE_SCHEMA
-                filesDb.isPathEmpty(path, projectId.flow.value) -> HistoryItem.SCHEMA_BULLIFY
-                else -> HistoryItem.SCHEMA_DEBULIFY
-            }
-
             val filesContext = fileName?.let {
-                filesDb.getRawContentByPath(path, fileName, projectId.flow.value)?.run {
-                    extractImports(this)
-                } ?: emptyList()
+                this@HistoryViewModel.db.fileDao()
+                    .getRawContentByPath(path, it, projectId.flow.value)?.run {
+                        extractImports(this)
+                    } ?: emptyList()
             }?.mapNotNull {
                 val (importPath, importFileName) = parseImport(it)
-                filesDb.getFileId(importPath, importFileName, projectId.flow.value)
+                this@HistoryViewModel.db.fileDao()
+                    .getFileId(importPath, importFileName, projectId.flow.value)
             } ?: emptyList()
 
             val historyItem = HistoryItem(
                 path = path,
                 fileName = fileName,
-                schema = schema,
+                schema = HistoryItem.SCHEMA_AGENT,
                 contextFiles = filesContext,
                 modelId = Prefs.models.flow.value.firstOrNull()
             )
-            val id = historyDb.addHistory(historyItem)
+            val id = this@HistoryViewModel.db.historyDao().addHistory(historyItem)
             Log.d(
                 "HistoryViewModel",
                 "createNewAiJob: id: $id path: $pathWithProjectName, $fileName"
@@ -164,14 +171,18 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
             .map { it.substringAfter("import").trim() }
     }
 
-    private fun dropProjectName(p: String) = p.replace("${Prefs.projectName.flow.value}/", "")
+    private fun dropProjectName(p: String) = if (p.contains("/")) {
+        p.replace("${Prefs.projectName.flow.value}/", "")
+    } else {
+        ""
+    }
 
     fun send(prompt: String, schema: String) {
         Log.d("HistoryViewModel", "send: $prompt")
         viewModelScope.launch {
             detailedItem.value?.let { historyItem ->
                 detailedItem.value = null
-                historyDb.updateHistory(
+                this@HistoryViewModel.db.historyDao().updateHistory(
                     historyItem.copy(
                         status = if (historyItem.status == HistoryStatus.RESPONDED) {
                             HistoryStatus.RE_APPLYING
@@ -194,4 +205,59 @@ class HistoryViewModel(val app: Application) : AndroidViewModel(app) {
             }
         }
     }
+
+    fun addAgentMessage(message: String, modelId: String, pathWithProjectName: String, fileName: String?) {
+        val path = dropProjectName(pathWithProjectName)
+        viewModelScope.launch {
+            this@HistoryViewModel.db.historyDao().addHistory(
+                HistoryItem(
+                    modelId = modelId,
+                    path = path,
+                    fileName = fileName,
+                    schema = HistoryItem.SCHEMA_AGENT,
+                    prompt = message,
+                    projectId = projectId.flow.value,
+                    status = HistoryStatus.SUBMITTED
+                )
+            )
+        }
+    }
+
+    suspend fun sync(mode: SyncMode = SyncMode.AUTO, modelId: String, forceSync: Boolean = false): Boolean {
+        val syncLog = db.syncDao().sync(
+            projectId = projectId.flow.value,
+            mode = mode,
+            forceSync = forceSync
+        )
+
+        if (syncLog.bulletsToUpdate > 0) {
+            addSyncJob(HistoryItem.SCHEMA_UPDATE_BULLET_WITH_RAW, modelId, "Sync Bullet points")
+        }
+        if (syncLog.rawsToUpdate > 0) {
+            addSyncJob(HistoryItem.SCHEMA_UPDATE_RAW_WITH_BULLETS, modelId, "Sync Raw files")
+        }
+        if (syncLog.rawsToCreate > 0) {
+            addSyncJob(HistoryItem.SCHEMA_DEBULIFY_FILE, modelId, "Create Raw files")
+        }
+        if (syncLog.bulletsToUpdate == 0 && syncLog.rawsToUpdate == 0 && syncLog.rawsToCreate == 0) {
+            return false
+        }
+        return true
+    }
+
+    private suspend fun addSyncJob(schema: String, modelId: String, prompt: String) {
+        db.historyDao().addHistory(
+            HistoryItem(
+                path = "",
+                fileName = null,
+                schema = schema,
+                prompt = prompt,
+                projectId = projectId.flow.value,
+                status = HistoryStatus.SUBMITTED,
+                modelId = modelId
+            )
+        )
+    }
+
+
 }

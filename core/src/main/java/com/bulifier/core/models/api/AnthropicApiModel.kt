@@ -1,7 +1,7 @@
 package com.bulifier.core.models.api
 
-import com.bulifier.core.api.MessageData
-import com.bulifier.core.api.MessageRequest
+import com.bulifier.core.ai.MessageData
+import com.bulifier.core.ai.MessageRequest
 import com.bulifier.core.db.HistoryItem
 import com.bulifier.core.models.ApiModel
 import com.bulifier.core.models.ApiResponse
