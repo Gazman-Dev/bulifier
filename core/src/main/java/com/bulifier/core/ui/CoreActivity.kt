@@ -1,14 +1,11 @@
 package com.bulifier.core.ui
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.R
-import com.bulifier.core.api.AiService
 import com.bulifier.core.databinding.ActivityMainBinding
 import com.bulifier.core.navigation.NavigationController
 import com.bulifier.core.navigation.NavigationManager
@@ -17,8 +14,6 @@ import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.ui.main.MainFragment
 import com.bulifier.core.ui.main.ProjectsFragment
 import dagger.hilt.android.AndroidEntryPoint
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlin.getValue
 
 @AndroidEntryPoint
@@ -33,9 +28,6 @@ abstract class CoreActivity : AppCompatActivity(), NavigationController {
 
         if (savedInstanceState == null) {
             onLoadMainScreen()
-            lifecycleScope.launch {
-                onServiceStarted()
-            }
         }
     }
 
@@ -52,12 +44,11 @@ abstract class CoreActivity : AppCompatActivity(), NavigationController {
         }
     }
 
-    open fun onLoadMainScreen() = navigateToMain()
-
-    open suspend fun onServiceStarted() {
-        delay(1)
-        startService(Intent(this@CoreActivity, AiService::class.java))
+    override fun finish() {
+        super.finish()
     }
+
+    open fun onLoadMainScreen() = navigateToMain()
 }
 
 

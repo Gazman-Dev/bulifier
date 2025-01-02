@@ -13,10 +13,8 @@ Types:
 Also you must provide a Settings section
 
 * Run for each file: True/False // should run AI for each input file or just once
-* output extension: txt // what extension to give to files in case couldn't terminate an extension
-* input extension:  txt // when processing multiple files it filters the input by file extension and work on all the project
+* output extension: txt // what extension to give to files
 * multi files output: True/False // will the output of a single AI call be one file or many
-* override files: True/False // it will only attempt to update existing files and will not create new ones.
 
 Run time params:
 

@@ -12,29 +12,39 @@ import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.view.inputmethod.EditorInfo
 import android.widget.EditText
 import android.widget.TextView
-import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
+import com.bulifier.core.databinding.DialogSyncOptionsBinding
 import com.bulifier.core.databinding.MainFragmentBinding
+import com.bulifier.core.db.SyncMode
 import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.security.ProductionSecurityFactory
 import com.bulifier.core.security.UiVerifier
 import com.bulifier.core.ui.GitUiHelper
+import com.bulifier.core.ui.ai.AgentBottomSheet
 import com.bulifier.core.ui.ai.AiHistoryFragment
 import com.bulifier.core.ui.ai.HistoryViewModel
+import com.bulifier.core.ui.ai.ModelsHelper
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
+import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import kotlin.getValue
@@ -49,7 +59,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
     lateinit var uiVerifier: UiVerifier
 
     private val viewModel by activityViewModels<MainViewModel>()
-    private val historyViewModel by activityViewModels<HistoryViewModel>()
+    private val historyModel by activityViewModels<HistoryViewModel>()
     private val gitViewModel by activityViewModels<GitViewModel>()
     private val filesAdapter by lazy { FilesAdapter(viewModel) }
     private val errorPattern by lazy { Regex("[a-zA-Z0-9]+\\.") }
@@ -57,38 +67,22 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         Regex("^[a-zA-Z0-9]+(\\.[a-zA-Z0-9]+)*$")
     }
 
+    private val security by lazy {
+        EntryPointAccessors.fromApplication(
+            binding.root.context.applicationContext, ProductionSecurityFactory::class.java
+        )
+    }
+
     private val folderNamePattern by lazy {
         Regex("^[a-zA-Z0-9/.]+$")
     }
 
-    private val callback by lazy {
-        object : OnBackPressedCallback(true) {
-            override fun handleOnBackPressed() {
-                if (viewModel.openedFile.value != null) {
-                    viewModel.closeFile()
-                } else {
-                    findNavController().popBackStack()
-                }
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        callback.isEnabled = true
-    }
-
-    override fun onPause() {
-        callback.isEnabled = false
-        super.onPause()
-    }
-
     override fun createBinding(
-        inflater: LayoutInflater,
-        container: ViewGroup?
+        inflater: LayoutInflater, container: ViewGroup?
     ) = MainFragmentBinding.inflate(inflater, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, null)
         binding.toolbar.settings.setOnClickListener {
             PopupMenu(requireContext(), binding.toolbar.settings).apply {
                 inflate(R.menu.settings_menu)
@@ -108,7 +102,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         binding.toolbar.createFolder.setOnClickListener {
             showCreateFileFolderDialog(false)
         }
-        binding.toolbar.jobs.setOnClickListener {
+        binding.toolbar.jobContainer.setOnClickListener {
             findNavController().navigate(AiHistoryFragment::class.java)
         }
 
@@ -123,24 +117,133 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             viewModel.resetSystemSchemas()
         }
 
-        binding.fab.setOnClickListener {
-            viewModel.fullPath.value.run {
-                historyViewModel.createNewAiJob(path, fileName)
-            }
-            findNavController().navigate(AiHistoryFragment::class.java)
+        binding.aiFab.setOnClickListener {
+            AgentBottomSheet().show(parentFragmentManager, "agent_bottom_sheet")
+        }
+        binding.syncFab.setOnClickListener {
+            showSyncOptions()
         }
 
-        requireActivity().onBackPressedDispatcher.addCallback(callback)
+        viewLifecycleOwner.lifecycleScope.launch {
+            historyModel.progress.collectLatest { progress ->
+                binding.toolbar.jobContainer.apply {
+                    val isInProgress = progress != null && progress < 1
+
+                    // Toggle visibility
+                    binding.toolbar.jobProgress.isVisible = isInProgress
+                    binding.toolbar.jobIcon.isVisible = !isInProgress
+
+                    if (isInProgress) {
+                        startDotAnimation(binding.toolbar.jobProgress, progress)
+                    } else {
+                        stopDotAnimation()
+                    }
+                }
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch{
+            viewModel.fullScreenMode.collectLatest { fullScreenMode ->
+                this@MainFragment.binding.toolbar.toolbar.isVisible = !fullScreenMode
+                binding.pathContainer.isVisible = !fullScreenMode
+                if (fullScreenMode) {
+                    binding.syncFab.hide()
+                    binding.aiFab.hide()
+                } else {
+                    binding.syncFab.show()
+                    binding.aiFab.show()
+                }
+            }
+        }
     }
+
+    private var dotJob: Job? = null
+
+    private fun startDotAnimation(textView: TextView, progress: Double) {
+        dotJob?.cancel() // Cancel any existing animation job
+        dotJob = viewLifecycleOwner.lifecycleScope.launch {
+            var dots = ""
+            while (isActive) {
+                dots = when (dots.length) {
+                    0 -> "."
+                    1 -> ".."
+                    2 -> "..."
+                    else -> ""
+                }
+                textView.text = String.format(java.util.Locale.US, "%.2f%%", progress * 100) + dots
+                delay(1000) // Wait for 1 second
+            }
+        }
+    }
+
+    // Function to stop dots animation
+    private fun stopDotAnimation() {
+        dotJob?.cancel()
+    }
+
+    private fun showSyncOptions() {
+        val binding = DialogSyncOptionsBinding.inflate(LayoutInflater.from(requireContext()))
+        var modelId: String? = null
+
+        ModelsHelper(
+            binding.modelSpinner, binding.modelSpinnerContainer, viewLifecycleOwner
+        ) {
+            modelId = it
+        }.setupModels()
+
+        val dialog =
+            MaterialAlertDialogBuilder(requireContext()).setView(binding.syncOptionsContainer)
+                .create()
+
+        binding.syncButton.setOnClickListener {
+            val syncAll = when (binding.syncModeRadioGroup.checkedRadioButtonId) {
+                R.id.radioChangesOnly -> false
+                R.id.radioAll -> true
+                else -> false // Default to changes only
+            }
+
+            val syncBullets = binding.syncBulletsCheckBox.isChecked
+
+            val uiVerifier: UiVerifier = security.uiVerifier()
+            if (!uiVerifier.verifySendAction(binding.syncOptionsContainer)) {
+                dialog.dismiss()
+                return@setOnClickListener
+            }
+
+            if (modelId == null) {
+                Snackbar.make(binding.syncButton, "Please select a model", Snackbar.LENGTH_SHORT)
+                    .show()
+            } else {
+                viewLifecycleOwner.lifecycleScope.launch {
+                    historyModel.sync(
+                        if (syncBullets) {
+                            SyncMode.BULLET
+                        } else {
+                            SyncMode.RAW
+                        }, modelId, syncAll
+                    ).let { result ->
+                        if (!result) {
+                            Snackbar.make(
+                                this@MainFragment.binding.syncFab,
+                                "No sync is needed - All is up to date",
+                                Snackbar.LENGTH_LONG
+                            ).show()
+                        }
+                    }
+                }
+                dialog.dismiss()
+            }
+        }
+
+        dialog.show()
+    }
+
 
     override fun onViewStateRestored(savedInstanceState: Bundle?) {
         super.onViewStateRestored(savedInstanceState)
         registerPath()
         GitUiHelper(
-            binding.toolbar.git,
-            gitViewModel,
-            viewModel,
-            viewLifecycleOwner
+            binding.toolbar.git, gitViewModel, viewModel, viewLifecycleOwner
         )
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -209,27 +312,25 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         })
     }
 
-    override fun onDestroyView() {
-        super.onDestroyView()
-        callback.remove()
-    }
-
     private fun showCreateFileFolderDialog(isFile: Boolean) {
-        val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(
-                if (isFile) "Create New File" else "Create New Folder"
-            )
-            .setMessage(
-                if (isFile) "Enter a name of a file, no spaces or special characters." else
-                    "Enter a name of a folder, no spaces or special characters."
-            )
-            .setView(R.layout.dialog_create_file)
-            .setPositiveButton("Create", null)
-            .setNegativeButton("Cancel", null)
-            .show()
+        val dialog = MaterialAlertDialogBuilder(requireContext()).setTitle(
+            if (isFile) "Create New File" else "Create New Folder"
+        ).setMessage(
+            if (isFile) "Enter a name of a file, no spaces or special characters." else "Enter a name of a folder, no spaces or special characters."
+        ).setView(R.layout.dialog_create_file).setPositiveButton("Create", null)
+            .setNegativeButton("Cancel", null).show()
 
         val fileNameEditText = dialog.findViewById<EditText>(R.id.file_name)
         val createButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
+
+        fileNameEditText?.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_DONE) {
+                createButton?.performClick()
+                true
+            } else {
+                false
+            }
+        }
 
         fileNameEditText?.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
@@ -303,10 +404,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
 
             // Set the ClickableSpan to the SpannableString
             spannableString.setSpan(
-                clickableSpan,
-                startIndex,
-                endIndex,
-                Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
+                clickableSpan, startIndex, endIndex, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
             )
 
             // Update startIndex for the next item, considering the separator length

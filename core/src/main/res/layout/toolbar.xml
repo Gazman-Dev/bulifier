@@ -64,14 +64,34 @@
             android:src="@drawable/git_logo"
             app:tint="@color/white" />
 
-        <ImageView
-            android:id="@+id/jobs"
+        <FrameLayout
+            android:id="@+id/jobContainer"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
-            android:layout_margin="8dp"
-            android:adjustViewBounds="true"
-            android:src="@drawable/baseline_list_24"
-            app:tint="@color/white" />
+            android:layout_margin="8dp">
+
+            <!-- Progress Percentage with Dots -->
+            <TextView
+                android:id="@+id/jobProgress"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:visibility="gone"
+                android:textColor="@color/white"
+                android:textSize="16sp"
+                android:text="0%" />
+
+            <!-- Job Icon -->
+            <ImageView
+                android:id="@+id/jobIcon"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:adjustViewBounds="true"
+                android:src="@drawable/baseline_list_24"
+                app:tint="@color/white" />
+        </FrameLayout>
+
+
 
         <ImageView
             android:id="@+id/settings"

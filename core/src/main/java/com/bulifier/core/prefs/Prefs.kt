@@ -142,3 +142,15 @@ class PrefLongValue(private val key: String) {
         _valueFlow.value = value
     }
 }
+
+class PrefBooleanValue(private val key: String) {
+    // Default to -1L if no value is found
+    private val _valueFlow = MutableStateFlow(pref.getBoolean(key, false))
+
+    val flow: StateFlow<Boolean> = _valueFlow
+
+    fun set(value: Boolean) {
+        pref.edit().putBoolean(key, value).apply()
+        _valueFlow.value = value
+    }
+}

@@ -1,9 +1,11 @@
-package com.bulifier.core.api
+package com.bulifier.core.ai
 
 class ResponseProcessor {
 
-    fun parseResponse(response: String, basePath: String): List<FileData> {
-        val lines = response.lines()
+    fun parseResponse(response: String): List<FileData> {
+        val lines = response.lines().filter {
+            it.isNotBlank() && it.trim() != "---"
+        }
         val fileDataList = mutableListOf<FileData>()
 
         var currentFileName = ""
@@ -18,7 +20,6 @@ class ResponseProcessor {
                     // Save the current file data if it exists
                     if (currentFileName.isNotEmpty()) {
                         addFile(
-                            basePath,
                             currentFileName,
                             fileDataList,
                             currentFileContent,
@@ -32,7 +33,7 @@ class ResponseProcessor {
                     currentFileName = trimmedLine.substringAfter("FileName:").trim()
                 }
 
-                trimmedLine.startsWith("-") && trimmedLine.contains(":") -> {
+                trimmedLine.startsWith("- ") && trimmedLine.contains(":") -> {
                     // Start of a new section
                     val sectionName = trimmedLine.substringAfter("-").substringBefore(":").trim()
                     inImportsSection = sectionName == "Imports"
@@ -41,11 +42,11 @@ class ResponseProcessor {
                     }
                 }
 
-                inImportsSection && trimmedLine.startsWith("-") -> {
+                inImportsSection && trimmedLine.startsWith("- ") -> {
                     // Line within the Imports section
-                    val importLine = trimmedLine.substringAfter("-").trim()
+                    val importLine = trimmedLine.substringAfter("- ").trim()
                     val importStatement = importLine.removePrefix("import").trim()
-                    currentImports.add("$basePath/$importStatement")
+                    currentImports.add(importStatement)
                 }
 
                 else -> {
@@ -58,7 +59,6 @@ class ResponseProcessor {
         // Add the last parsed file data
         if (currentFileName.isNotEmpty()) {
             addFile(
-                basePath,
                 currentFileName,
                 fileDataList,
                 currentFileContent,
@@ -70,18 +70,16 @@ class ResponseProcessor {
     }
 
     private fun addFile(
-        basePath: String,
         currentFileName: String,
         fileDataList: MutableList<FileData>,
         currentFileContent: java.lang.StringBuilder,
         currentImports: MutableList<String>
     ) {
-        val fullPath = "$basePath/$currentFileName"
         fileDataList.add(
             FileData(
                 content = currentFileContent.toString().trim(),
                 imports = currentImports,
-                fullPath = fullPath,
+                fullPath = currentFileName,
                 isFile = true
             )
         )

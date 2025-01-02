@@ -1,38 +1,65 @@
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/contentFrame"
-    android:orientation="vertical"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:animateLayoutChanges="true">
 
-    <ScrollView
-        android:layout_width="match_parent"
+    <com.bulifier.core.ui.content.ScrollableEditText
+        android:id="@+id/textBox"
+        android:layout_width="0dp"
         android:layout_height="0dp"
-        android:layout_weight="1">
+        android:layout_margin="8dp"
+        app:layout_constraintBottom_toTopOf="@id/switchesRow"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:background="@android:color/transparent"
+        android:ellipsize="none"
+        android:lineSpacingExtra="2dp"
+        android:maxLines="1000000"
+        android:overScrollMode="always"
+        android:scrollbars="horizontal|vertical"
+        android:scrollHorizontally="true"
+        android:textSize="18sp" />
 
-        <com.bulifier.core.ui.content.ScrollableEditText
-            android:id="@+id/textBox"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
-            android:ellipsize="none"
-            android:lineSpacingExtra="2dp"
-            android:maxLines="1000000"
-            android:overScrollMode="always"
-            android:scrollbars="horizontal|vertical"
-            android:scrollHorizontally="true"
-            android:textSize="18sp" />
-    </ScrollView>
-
-    <androidx.appcompat.widget.SwitchCompat
-        android:id="@+id/editMode"
-        android:layout_width="wrap_content"
+    <androidx.constraintlayout.widget.ConstraintLayout
+        android:id="@+id/switchesRow"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_gravity="start|bottom"
-        android:checked="false"
-        android:includeFontPadding="true"
-        android:text="Edit Mode "
-        android:textColor="@color/colorPrimary"
-        app:thumbTint="@color/colorPrimaryDark" />
+        android:layout_marginStart="16dp"
+        android:layout_marginEnd="16dp"
+        android:layout_marginBottom="16dp"
+        android:layout_marginTop="8dp"
+        android:animateLayoutChanges="true"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/textBox">
 
-</LinearLayout>
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/editMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Edit Mode"
+            android:textColor="@color/colorPrimary"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toTopOf="parent"
+            app:thumbTint="@color/colorPrimaryDark" />
+
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/wrapMode"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="16dp"
+            android:text="Wrapping"
+            android:textColor="@color/colorPrimary"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintStart_toEndOf="@id/editMode"
+            app:layout_constraintTop_toTopOf="parent"
+            app:thumbTint="@color/colorPrimaryDark" />
+
+    </androidx.constraintlayout.widget.ConstraintLayout>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

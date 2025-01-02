@@ -102,13 +102,14 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:background="@android:color/transparent"
-                android:scrollbars="vertical"
-                android:inputType="textMultiLine"
-                android:gravity="top|start"
-                android:hint="Prompt here..."
                 android:focusable="true"
                 android:focusableInTouchMode="true"
-                android:overScrollMode="always" />
+                android:gravity="top|start"
+                android:hint="Prompt here..."
+                android:imeOptions="actionDone"
+                android:inputType="textMultiLine"
+                android:overScrollMode="always"
+                android:scrollbars="vertical" />
 
         </androidx.cardview.widget.CardView>
 

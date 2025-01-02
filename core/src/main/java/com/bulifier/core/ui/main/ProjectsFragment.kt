@@ -80,7 +80,7 @@ class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
                 job = viewLifecycleOwner.lifecycleScope.launch {
                     val exists = mainViewModel.isProjectExists(projectName)
                     if (exists) {
-                        binding.createButton.text = "Open"
+                        binding.createButton.text = "Open & Update"
                     } else {
                         binding.createButton.text = "Create"
                     }

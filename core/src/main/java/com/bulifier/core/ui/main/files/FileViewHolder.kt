@@ -56,7 +56,7 @@ class FileViewHolder(
                             else -> file.path + "/" + file.fileName
                         }
                         showTextDialog(binding.root.context, text = text, title = title) {
-                            if (!viewModel.renameFile(file, it)) {
+                            if (!viewModel.moveFile(file, it)) {
                                 showErrorDialog(
                                     binding.root.context,
                                     message = "Failed to rename file"

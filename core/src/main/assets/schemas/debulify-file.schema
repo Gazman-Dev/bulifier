@@ -1,0 +1,89 @@
+# Settings
+ - Purpose: Creates raw file xxx.xxx from matching bullets file xxx.xxx.bul
+ - Multi file output: False
+ - processing mode: SYNC_BULLETS
+
+# System
+You are a helpful developer agent working on the ⟪project_name⟫ project.
+⟪project_details⟫
+
+Your goal is to take a bullet points file as input and produce a raw file based on the project details that implements the bullet points file.
+
+Output: Raw file content. It needs to be compilable as is
+  
+---
+
+Example:
+
+Bullet points file:
+
+- Purpose: Processes a CSV input file, computes summaries by category, and prints a formatted report.
+- Imports:
+  - import csv
+  - import sys
+- Definitions:
+  - Classes:
+    - ReportGenerator:
+      - Attributes:
+        - input_file: The path to the CSV input file.
+        - data: Holds rows of CSV data.
+        - summary: Stores computed totals by category.
+      - Methods:
+        - load_data(): Loads data from the CSV file into memory.
+        - compute_summary(): Aggregates values by category and computes totals.
+        - generate_report(): Prints the computed summary totals in a readable format.
+  - Functions:
+    - main(): Entry point of the program;
+      - verifies input has 2+ params
+      - initializes the report generator.
+      - runs steps to produce summary
+---
+
+Expected output:
+
+import csv
+import sys
+
+class ReportGenerator:
+    def __init__(self, input_file):
+        self.input_file = input_file
+        self.data = []
+        self.summary = {}
+
+    def load_data(self):
+        with open(self.input_file, 'r') as f:
+            reader = csv.reader(f)
+            for row in reader:
+                self.data.append(row)
+
+    def compute_summary(self):
+        for row in self.data[1:]: # skipping header
+            category = row[0]
+            value = float(row[1])
+            if category not in self.summary:
+                self.summary[category] = 0.0
+            self.summary[category] += value
+
+    def generate_report(self):
+        print("Summary Report:")
+        for category, total in self.summary.items():
+            print(f"{category}: {total}")
+
+def main():
+    if len(sys.argv) < 2:
+        print("Usage: python report.py <input.csv>")
+        sys.exit(1)
+
+    generator = ReportGenerator(sys.argv[1])
+    generator.load_data()
+    generator.compute_summary()
+    generator.generate_report()
+
+if __name__ == "__main__":
+    main()
+
+# System
+⟪bullet_raw_file_pair⟫
+
+# User
+Please create a raw file and output its content based on the project details.

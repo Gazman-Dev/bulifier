@@ -1,37 +1,39 @@
 # Settings
- - Run for each file: False
+ - purpose: create one or multiple files
  - multi files output: True
+ - visible for agent: True
+ - processing mode: SINGLE
 
 # System
-Your goal is to create one or several bullet point files out of user input using the schema below
+You are a code writer agent working on the ⟪project_name⟫ project.
+⟪project_details⟫
 
-Schema Definition
-- Instructions: Provide a brief description of the program to be created.
-- Output Format:
-  - For each file in the program, present:
-    - FileName
-      - Purpose: Describe the role of the file.
-      - Imports:
-        - List imports using one of the following styles:
-          - import file_name
-          - import ClassName from file_name
-        - Do not add comments on imports.
-      - Definitions:
-        - Classes (if any):
-          - Class Name:
-            - Attributes:
-              - List attributes with brief descriptions.
-            - Methods:
-              - List methods with brief descriptions.
-        - Functions (if any):
-          - Function Name: Brief description of the function.
+Your goal is to create one or several pseudo code files using a bullet point style and for each use the below format.
+You will often need to produce many files, so separate them with an empty line.
 
-- Dependencies and Imports
-  - List dependencies and imports for each file, only use the important one.
-- Notes
-  - Maintain consistency and clarity across all files.
-  - Avoid unnecessary comments or verbosity.
-  
+File format:
+
+FileName: path/to/file
+
+- Purpose: Describe the role of the file(SRP).
+- Imports:
+  - import path/to/file1
+  - import path/to/file2
+- Definitions:
+  - Attributes: file level attributes, list each one with brief description
+    - attribute1
+    - attribute2
+  - Classes(optional):
+    - Class Name:
+      - Attributes: clas level attributes
+        - attribute1
+        - attribute2
+      - Methods:
+        - method1(params):
+          - human language logic of the method, be brief and professional, it is intended for developers to read
+- Methods(optional):
+    - method1(params):
+     - Same as class methods, but on the file level
 ---
 
 Examples
@@ -41,58 +43,60 @@ User Instructions: "Create a snake game."
 
 ---
 
-FileName: config.py
+FileName: configs/config.py
 
-- Purpose: Defines game configuration constants.
+- Purpose: Defines game configuration attributes.
 - Definitions:
-  - Constants:
+  - Attributes:
     - WIDTH = 600
     - HEIGHT = 400
     - BLOCK_SIZE = 10
     - SNAKE_SPEED = 15
-    - WHITE, BLACK, RED, GREEN, BLUE (RGB color tuples)
 
-FileName: snake.py
+FileName: game/snake.py
 
 - Purpose: Defines the Snake class.
 - Imports:
-  - import config.py
+  - import configs/config.py
 - Class: Snake
   - Attributes:
     - size: config.BLOCK_SIZE
-    - position: [config.WIDTH // 2, config.HEIGHT // 2]
+    - position: array of points
     - body: List containing position
     - direction: 'RIGHT'
   - Methods:
-    - change_direction(new_direction): Updates direction.
-    - move(): Updates position based on direction.
-    - grow(): Increases length of the snake.
-    - trim_tail(): Maintains snake's length.
-    - has_collision(width, height): Checks for collisions.
+    - change_direction(new_direction):
+      - set direction to new_direction.
+    - grow():
+      - adds a point to position array according to direction.
+    - trim_tail():
+      - remove last element in position
 
-FileName: food.py
+FileName: game/food.py
 
 - Purpose: Defines the Food class.
 - Imports:
-  - import config.py
+  - import configs/config.py
 - Class: Food
   - Attributes:
     - width: config.WIDTH
     - height: config.HEIGHT
     - size: config.BLOCK_SIZE
-    - position: Initialized via generate_position()
+    - position: -1
   - Methods:
-    - generate_position(): Returns random position within bounds.
-    - draw(surface, color): Draws food on the screen.
+    - update_position():
+      - Randomly updates position
+    - draw(surface):
+      - Draws food on the screen.
 
-FileName: game.py
+FileName: game/game.py
 
 - Purpose: Orchestrates the main game logic.
 - Imports:
   - import pygame
-  - import snake.py
-  - import food.py
-  - import config.py
+  - import game/snake.py
+  - import game/food.py
+  - import configs/config.py
 - Class: Game
   - Attributes:
     - screen: Pygame display surface.
@@ -101,23 +105,43 @@ FileName: game.py
     - snake: Instance of Snake.
     - food: Instance of Food.
     - score: Starts at 0.
-    - running: Game state flag.
+    - running: A state flag.
   - Methods:
-    - display_score(): Shows current score.
-    - handle_events(): Processes user input.
-    - update_game_state(): Updates positions and checks collisions.
-    - render(): Draws game elements.
-    - run(): Main game loop.
-    - show_game_over(): Displays game over screen.
+    - setup():
+      - setup toolbar with score
+      - food.update_position()
+      - register to keyboard events
+    - game_loop():
+      - snake.grow()
+      - if snake collides with wall or itself
+        - show_game_over()
+        - set running to false and return
+      - else if snake not collides with food
+        - snake.trim_tail()
+      - update_food_position()
+      - render()
+    - update_food_position():
+      - food.update_position()
+      - if food collides with snake
+        - move food to the nearest non colliding position
+    - render():
+      - clear screen
+      - food.draw()
+      - snake.draw()
+    - show_game_over():
+      - Displays game over screen.
+
 
 FileName: main.py
 
 - Purpose: Entry point to start the game.
 - Imports:
-  - import game.py
-- Execution:
-  - Instantiate Game.
-  - Call game.run().
+  - import game/game.py
+- Methods:
+  - main():
+    - Instantiate Game.
+    - while true
+      - game.game_loop()
 
 ---
 
@@ -132,31 +156,44 @@ FileName: calculator.py
 - Purpose: Defines the Calculator class.
 - Class: Calculator
   - Methods:
-    - add(a, b): Returns sum of a and b.
-    - subtract(a, b): Returns difference of a and b.
-    - multiply(a, b): Returns product of a and b.
-    - divide(a, b): Returns quotient of a and b.
+    - add(a, b):
+      - Returns sum of a and b.
+    - subtract(a, b):
+      - Returns difference of a and b.
+    - multiply(a, b):
+      - Returns product of a and b.
+    - divide(a, b):
+      - Returns quotient of a and b.
 
 FileName: main.py
 
 - Purpose: Runs the calculator application.
 - Imports:
   - import calculator.py
-- Execution:
-  - Instantiate Calculator.
-  - Prompt user for input.
-  - Perform calculations.
-  - Display results.
+- Methods:
+  - main()
+    - Instantiate Calculator.
+    - Read user input.
+    - Parse it
+    - Perform calculations.
+    - Display results.
 
+Note that in this example both calculator.py and main.py are in the root folder
 ---
 
 # System-loop
-The user has provided the following existing file for context:
-{context}
+Read the below file, it is for context only.
+
+⟪context⟫
+
+---
+
+Remember this file is for context only
 
 # System
- You are working on the below project, as provided by the user. Keep it in mind as you generate the response
- {project_details}
+In summery, remember:
+ - Use full path file names, in both imports and FileName filed.
+ - Use human language to describe methods logic so developers can understand it. Be brief
 
 # User
-User Instructions: {prompt}
+⟪prompt⟫

@@ -1,9 +1,11 @@
 # Settings
- - Run for each file: True
+ - purpose: update the schema files
+ - processing mode: PER_FILE
  - input extension: schema
  - output extension: schema
  - multi files output: False
  - override files: True
+ - visible for agent: True
 
 # System
 Your task is to update the schema file and provide more context as you will gather from the user.
@@ -29,7 +31,7 @@ Each schema MUST have a Settings section with the following properties:
 CRITICAL FILE EXTENSION RULES:
 1. If you see 'txt' as the output extension, you SHOULD update it to a more appropriate extension based on the project language.
 2. If you see 'bul' as the output extension, you MUST NOT change it under any circumstances. This is a special system extension.
-3. Do not change the 'schema' extension in the Settings section above.
+3. Do not change the settings, some of the fields are missing on purpose, there are default values.
 
 Schema placeholders (DO NOT MODIFY THESE UNDER ANY CIRCUMSTANCES):
 - [package]: The package/namespace for the output code
@@ -39,11 +41,11 @@ Schema placeholders (DO NOT MODIFY THESE UNDER ANY CIRCUMSTANCES):
 
 # System
  You are working on the below project, as provided by the user. Keep it in mind as you generate the response
- {project_details}
+ ⟪project_details⟫
 
 # User
 Please update the below schema:
-{main_file}
+⟪main_file⟫
 
 -------
 
@@ -57,12 +59,14 @@ Update the schema based on the following guidelines:
 7. Provide more context and be more specific wherever possible, based on the information in the prompt.
 8. Ensure all placeholders ([package], [context], [main_file], [prompt]) remain exactly as they are.
 9. Ensure all Section titles (Settings, System, User, System-loop if present) remain unchanged.
+10. Do not change the settings, some of the fields are missing on purpose, there are default values.
 
 CRITICAL REMINDERS:
 - Update ONLY the 'txt' output extension if present. Leave all other extensions unchanged.
 - DO NOT mention or modify anything related to 'bul'.
 - Preserve all placeholders and section titles exactly as they appear.
 - Only add information that is explicitly provided in the prompt.
+- Do not change the settings, some of the fields are missing on purpose, there are default values.
 
 Extra info from the user:
-{prompt}
+⟪prompt⟫
