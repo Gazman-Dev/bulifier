@@ -400,6 +400,9 @@ interface FileDao {
     @Query("SELECT count(*) > 0 FROM files WHERE path = :path AND project_id = :projectId")
     suspend fun isPathExists(path: String, projectId: Long): Boolean
 
+    @Query("SELECT count(*) > 0 FROM files WHERE path = :path and file_name = :fileName AND project_id = :projectId")
+    suspend fun isFileExists(path: String, fileName: String, projectId: Long): Boolean
+
     @Query("SELECT * FROM projects WHERE project_id = :projectId")
     fun getProjectById(projectId: Long): Project
 
@@ -416,7 +419,7 @@ interface FileDao {
             contents.*
         FROM files
             JOIN contents ON files.file_id = contents.file_id
-        WHERE files.project_id = :projectId
+        WHERE files.project_id = :projectId and files.to_delete = 0
         ORDER BY files.file_id ASC
     """
     )

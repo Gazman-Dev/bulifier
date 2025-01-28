@@ -3,7 +3,7 @@ package com.bulifier.core.db
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val DB_VERSION = 9
+const val DB_VERSION = 10
 
 private val migrationFunctions = arrayOf<(SupportSQLiteDatabase) -> Unit>(
     {
@@ -118,6 +118,9 @@ private val migrationFunctions = arrayOf<(SupportSQLiteDatabase) -> Unit>(
     {
         it.execSQL("DROP INDEX IF EXISTS index_files_path_project_id")
         it.execSQL("CREATE INDEX index_files_to_delete_path_project_id ON files(to_delete, path, project_id)")
+    },
+    {
+        it.execSQL("ALTER TABLE history ADD COLUMN created INTEGER NOT NULL DEFAULT 0")
     }
 )
 

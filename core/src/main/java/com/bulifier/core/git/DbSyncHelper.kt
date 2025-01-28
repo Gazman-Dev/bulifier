@@ -2,6 +2,7 @@ import android.content.Context
 import com.bulifier.core.db.Content
 import com.bulifier.core.db.FileData
 import com.bulifier.core.db.db
+import com.bulifier.core.schemas.SchemaModel
 import java.io.File
 import com.bulifier.core.db.File as DbFile
 
@@ -75,23 +76,13 @@ class DbSyncHelper(
             context.filesDir.mkdirs()
         }
 
-        val files: List<FileData> = db.fileDao().exportFilesAndContents(projectId)
-        files.mapNotNull {
-            if (it.isFile) {
-                null
-            } else {
-                it.path + "/" + it.fileName
-            }
-        }.toSet().forEach {
-            File(srcDir, it).apply {
-                mkdirs()
-                if (clearOldFiles) {
-                    deleteAllFilesInFolder(this)
-                }
+        if(clearOldFiles) {
+            SchemaModel.getRoots(projectId)?.forEach {
+                deleteAllFilesInFolder(File(srcDir, it))
             }
         }
 
-
+        val files: List<FileData> = db.fileDao().exportFilesAndContents(projectId)
         files.forEach { fileData ->
             exportFile(
                 baseDir = srcDir,

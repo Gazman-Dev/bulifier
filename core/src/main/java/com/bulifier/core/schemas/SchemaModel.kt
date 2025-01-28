@@ -49,6 +49,7 @@ object SchemaModel {
     private val scope = CoroutineScope(Dispatchers.Default + job)
     private lateinit var db: AppDatabase
     private lateinit var appContext: Context
+    private var gitRoots: GitRoots? = null
 
     fun init(appContext: Context) {
         db = appContext.db
@@ -63,12 +64,44 @@ object SchemaModel {
         }
     }
 
+    fun verifySchemasRequest(projectId: Long) {
+        scope.launch {
+            verifySchemas(Prefs.projectId.flow.value)
+            reloadSchemas(projectId)
+        }
+    }
+
     private suspend fun verifySchemas(projectId: Long) {
         withContext(Dispatchers.IO) {
             if (!db.fileDao().isPathExists("schemas", projectId)) {
                 createDefaultSchemas(projectId)
             }
+            gitRoots = GitRoots(db, projectId).apply {
+                load()
+            }
         }
+    }
+
+    fun addRoot(root: String) {
+        scope.launch {
+            gitRoots?.addRoot(root)
+        }
+    }
+
+    suspend fun getRoots(projectId: Long) =
+        db.fileDao().getContent("", GIT_ROOTS_FILE_NAME, projectId)?.content?.lines()?.filter {
+            it.isNotBlank()
+        }
+
+    private suspend fun createGitRoots(projectId: Long) {
+        db.fileDao().insertFile(
+            File(
+                path = "",
+                fileName = "git_roots.settings",
+                isFile = true,
+                projectId = projectId
+            )
+        )
     }
 
     private suspend fun createDefaultSchemas(projectId: Long) {
@@ -139,8 +172,7 @@ object SchemaModel {
                         try {
                             val values = line.substring(" - ".length - 1).lowercase().split(":")
                             values[0].trim() to values[1].trim()
-                        }
-                        catch (e: Exception) {
+                        } catch (e: Exception) {
                             throw Error("Error parsing settings schema: $line", e)
                         }
                     }
@@ -149,7 +181,7 @@ object SchemaModel {
                         inputExtension = map["input extension"] ?: "bul",
                         processingMode = map["processing mode"]?.let {
                             ProcessingMode.fromString(it)
-                        }?: ProcessingMode.SINGLE,
+                        } ?: ProcessingMode.SINGLE,
                         multiFilesOutput = map["multi files output"] == "true",
                         overrideFiles = map["override files"] == "true",
                         visibleForAgent = map["visible for agent"] == "true",

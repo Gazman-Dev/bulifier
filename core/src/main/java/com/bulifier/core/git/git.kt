@@ -156,16 +156,42 @@ object GitHelper {
     suspend fun clean(repoDir: File) {
         withContext(Dispatchers.IO) {
             Git.open(repoDir).use { git ->
-                git.reset()
-                    .setMode(ResetCommand.ResetType.HARD)
-                    .call()
-
-                git.clean()
-                    .setCleanDirectories(true)  // Removes untracked directories
-                    .setIgnore(false)  // Removes ignored files as well
-                    .call()
+                clean(git)
             }
         }
     }
 
+    private fun clean(git: Git) {
+        git.reset()
+            .setMode(ResetCommand.ResetType.HARD)
+            .call()
+
+        git.clean()
+            .setCleanDirectories(true)  // Removes untracked directories
+            .setIgnore(false)  // Removes ignored files as well
+            .call()
+    }
+
+    suspend fun resetAndRevert(commitHash: String, repoDir: File) {
+        withContext(Dispatchers.IO) {
+            Git.open(repoDir).use { git ->
+                clean(git)
+
+                // Lookup the commit by hash
+                val headCommit = git.repository.resolve("HEAD")
+                    ?: throw Exception("Failed to resolve HEAD commit.")
+
+                // If the commit hash matches the current HEAD, do nothing
+                if (headCommit.name != commitHash) {
+                    // Lookup the commit to revert
+                    val commit = git.repository.resolve(commitHash)
+                        ?: throw Exception("Commit not found: $commitHash")
+
+                    git.revert()
+                        .include(commit)
+                        .call()
+                }
+            }
+        }
+    }
 }

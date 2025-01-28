@@ -15,10 +15,11 @@ interface HistoryDao {
     @Query(
         """
     SELECT *, 
-       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
+       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected,
+       CASE WHEN schema = 'agent' then 0 else 1 end as agent_order
     FROM history 
     WHERE project_id = :projectId 
-    ORDER BY last_updated DESC
+    ORDER BY created DESC, agent_order ASC
 """
     )
     fun getHistory(promptId: Long, projectId: Long): PagingSource<Int, HistoryItemWithSelection>
@@ -28,7 +29,7 @@ interface HistoryDao {
     SELECT * 
     FROM history 
         WHERE prompt_id = :promptId 
-    ORDER BY last_updated DESC
+    ORDER BY created DESC
 """
     )
     fun getHistoryItem(promptId: Long): HistoryItem
@@ -36,15 +37,16 @@ interface HistoryDao {
     @Query(
         """
     SELECT *, 
-       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected 
+       CASE WHEN :promptId = prompt_id THEN 1 ELSE 0 END as selected ,
+       CASE WHEN schema = 'agent' then 0 else 1 end as agent_order
     FROM history 
     WHERE project_id = :projectId 
-    ORDER BY last_updated DESC
+    ORDER BY created DESC
 """
     )
     suspend fun getHistoryDebug(promptId: Long, projectId: Long): List<HistoryItemWithSelection>
 
-    @Query("SELECT prompt_id FROM history WHERE status in (:statuses) and project_id = :projectId order by last_updated")
+    @Query("SELECT prompt_id FROM history WHERE status in (:statuses) and project_id = :projectId order by created")
     fun getHistoryIdsByStatuses(
         statuses: List<HistoryStatus>,
         projectId: Long
@@ -109,16 +111,12 @@ interface HistoryDao {
         """
 SELECT 
     SUM(CASE 
-            WHEN progress != -1 THEN progress * 2.0  -- Use a floating-point literal
-            WHEN status = 'RESPONDED' THEN 1.0  -- Use a floating-point literal
-            ELSE 0  -- Use a floating-point literal
-        END) / 
-    SUM(CASE 
-            WHEN progress != -1 THEN 2.0  -- Use a floating-point literal
-            ELSE 1.0  -- Use a floating-point literal
-        END) AS progress_percentage
+            WHEN progress != -1 THEN 1 - progress
+            WHEN status = 'RESPONDED' THEN 0.0
+            ELSE 1.0
+        END)
 FROM history
-WHERE status NOT IN ('ERROR', 'RESPONDED', 'PROMPTING') or (status = 'RESPONDED' and progress != -1)
+WHERE status NOT IN ('ERROR', 'RESPONDED', 'PROMPTING') or (status = 'RESPONDED' and progress != -1 and progress != 1)
   AND project_id = :projectId;
 
         """

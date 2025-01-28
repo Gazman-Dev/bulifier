@@ -35,7 +35,12 @@ val checksum = Adler32()
 
 data class HistoryItemWithSelection(
     @Embedded val historyItem: HistoryItem,
-    val selected: Boolean
+
+    @ColumnInfo(name = "selected")
+    val selected: Boolean,
+
+    @ColumnInfo(name = "agent_order")
+    val agentOrder: Boolean
 )
 
 @Keep

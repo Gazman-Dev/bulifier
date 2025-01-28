@@ -1,21 +1,23 @@
 package com.bulifier.core.ui.main
 
-import android.content.DialogInterface
+import android.animation.ArgbEvaluator
+import android.animation.ObjectAnimator
+import android.animation.ValueAnimator
+import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
-import android.text.Editable
 import android.text.SpannableString
 import android.text.Spanned
 import android.text.TextPaint
-import android.text.TextWatcher
 import android.text.method.LinkMovementMethod
 import android.text.style.ClickableSpan
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.inputmethod.EditorInfo
-import android.widget.EditText
+import android.widget.ImageView
 import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -61,20 +63,15 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
     private val viewModel by activityViewModels<MainViewModel>()
     private val historyModel by activityViewModels<HistoryViewModel>()
     private val gitViewModel by activityViewModels<GitViewModel>()
-    private val filesAdapter by lazy { FilesAdapter(viewModel) }
-    private val errorPattern by lazy { Regex("[a-zA-Z0-9]+\\.") }
-    private val fileNamePattern by lazy {
-        Regex("^[a-zA-Z0-9]+(\\.[a-zA-Z0-9]+)*$")
-    }
+    private val filesAdapter by lazy { FilesAdapter(viewModel, gitViewModel) }
+    private var currentGitColor = Color.Transparent.toArgb()
+    private var colorAnimator: ValueAnimator? = null
+
 
     private val security by lazy {
         EntryPointAccessors.fromApplication(
             binding.root.context.applicationContext, ProductionSecurityFactory::class.java
         )
-    }
-
-    private val folderNamePattern by lazy {
-        Regex("^[a-zA-Z0-9/.]+$")
     }
 
     override fun createBinding(
@@ -96,12 +93,6 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         binding.toolbar.showProjects.setOnClickListener {
             findNavController().navigate(ProjectsFragment::class.java)
         }
-        binding.toolbar.createFile.setOnClickListener {
-            showCreateFileFolderDialog(true)
-        }
-        binding.toolbar.createFolder.setOnClickListener {
-            showCreateFileFolderDialog(false)
-        }
         binding.toolbar.jobContainer.setOnClickListener {
             findNavController().navigate(AiHistoryFragment::class.java)
         }
@@ -117,6 +108,30 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             viewModel.resetSystemSchemas()
         }
 
+        viewLifecycleOwner.lifecycleScope.launch {
+            gitViewModel.branch.collectLatest {
+                binding.toolbar.gitBranch.text = it
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            gitViewModel.gitStatus.collectLatest { status ->
+                val endColor = when (status) {
+                    GitViewModel.GitStatus.IDLE -> Color.Transparent.toArgb()
+                    GitViewModel.GitStatus.PROCESSING -> Color(1f, 1f, 0f, 0.5f).toArgb() // Yellow
+                    GitViewModel.GitStatus.SUCCESS -> Color(0f, 1f, 0f, 0.5f).toArgb() // Green
+                    GitViewModel.GitStatus.ERROR -> Color(1f, 0f, 0f, 0.5f).toArgb() // Red
+                }
+
+                // Animate the color change smoothly
+                animateColorChange(
+                    binding.toolbar.git,
+                    R.id.background,
+                    endColor
+                )
+            }
+        }
+
         binding.aiFab.setOnClickListener {
             AgentBottomSheet().show(parentFragmentManager, "agent_bottom_sheet")
         }
@@ -127,7 +142,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         viewLifecycleOwner.lifecycleScope.launch {
             historyModel.progress.collectLatest { progress ->
                 binding.toolbar.jobContainer.apply {
-                    val isInProgress = progress != null && progress < 1
+                    val isInProgress = progress != null && progress > 0
 
                     // Toggle visibility
                     binding.toolbar.jobProgress.isVisible = isInProgress
@@ -142,7 +157,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             }
         }
 
-        viewLifecycleOwner.lifecycleScope.launch{
+        viewLifecycleOwner.lifecycleScope.launch {
             viewModel.fullScreenMode.collectLatest { fullScreenMode ->
                 this@MainFragment.binding.toolbar.toolbar.isVisible = !fullScreenMode
                 binding.pathContainer.isVisible = !fullScreenMode
@@ -165,12 +180,18 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             var dots = ""
             while (isActive) {
                 dots = when (dots.length) {
-                    0 -> "."
-                    1 -> ".."
-                    2 -> "..."
+                    0 -> "_"
+                    1 -> "__"
+                    2 -> "___"
                     else -> ""
                 }
-                textView.text = String.format(java.util.Locale.US, "%.2f%%", progress * 100) + dots
+                val spaces = " ".repeat(3 - dots.length)
+                val formattedProgress = if (progress % 1.0 == 0.0) {
+                    String.format(java.util.Locale.US, "%.0f", progress)
+                } else {
+                    String.format(java.util.Locale.US, "%.2f", progress)
+                }
+                textView.text = "$spaces$dots$formattedProgress$dots$spaces"
                 delay(1000) // Wait for 1 second
             }
         }
@@ -243,7 +264,12 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         super.onViewStateRestored(savedInstanceState)
         registerPath()
         GitUiHelper(
-            binding.toolbar.git, gitViewModel, viewModel, viewLifecycleOwner
+            binding.toolbar.git,
+            binding.toolbar.gitContainer,
+            gitViewModel,
+            viewModel,
+            viewLifecycleOwner,
+            parentFragmentManager
         )
 
         viewLifecycleOwner.lifecycleScope.launch {
@@ -312,72 +338,6 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         })
     }
 
-    private fun showCreateFileFolderDialog(isFile: Boolean) {
-        val dialog = MaterialAlertDialogBuilder(requireContext()).setTitle(
-            if (isFile) "Create New File" else "Create New Folder"
-        ).setMessage(
-            if (isFile) "Enter a name of a file, no spaces or special characters." else "Enter a name of a folder, no spaces or special characters."
-        ).setView(R.layout.dialog_create_file).setPositiveButton("Create", null)
-            .setNegativeButton("Cancel", null).show()
-
-        val fileNameEditText = dialog.findViewById<EditText>(R.id.file_name)
-        val createButton = dialog.getButton(DialogInterface.BUTTON_POSITIVE)
-
-        fileNameEditText?.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == EditorInfo.IME_ACTION_DONE) {
-                createButton?.performClick()
-                true
-            } else {
-                false
-            }
-        }
-
-        fileNameEditText?.addTextChangedListener(object : TextWatcher {
-            override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-
-            override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
-                val name = s.toString()
-                if ((if (isFile) fileNamePattern else folderNamePattern).matches(name)) {
-                    fileNameEditText.error = null
-                    createButton.isEnabled = true
-                } else {
-                    if (name.isNotBlank() && (!isFile || needError(name))) {
-                        fileNameEditText.error =
-                            if (isFile) "Invalid file name" else "Invalid folder name"
-                    }
-                    createButton.isEnabled = false
-                }
-            }
-
-            override fun afterTextChanged(s: Editable?) {}
-        })
-
-        createButton.setOnClickListener {
-            fileNameEditText?.text?.toString()?.let {
-                if (isFile) {
-                    createFile(it)
-                } else {
-                    createFolder(it)
-                }
-            }
-            dialog.dismiss()
-        }
-    }
-
-    private fun needError(fileName: String): Boolean {
-        return !errorPattern.matches(fileName)
-    }
-
-    // To be implemented
-    private fun createFile(fileName: String) {
-        viewModel.updateCreateFile(fileName)
-    }
-
-    private fun createFolder(folderName: String) {
-        viewModel.createFolder(folderName)
-    }
-
-
     private fun createClickableSpanString(textView: TextView, items: List<TitleAction>) {
         val separator = " / "
         // Concatenate all titles with the separator
@@ -416,6 +376,27 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
 
         // IMPORTANT: Enable movement method for handling clicks
         textView.movementMethod = LinkMovementMethod.getInstance()
+    }
+
+    fun animateColorChange(imageView: ImageView, layerId: Int, endColor: Int) {
+        val drawable = imageView.drawable as? LayerDrawable
+        val layer = drawable?.findDrawableByLayerId(layerId)?.mutate()
+
+        if (layer != null) {
+            // Use ObjectAnimator for a smooth color transition
+            colorAnimator?.cancel()
+            val colorAnimator = ObjectAnimator.ofArgb(currentGitColor, endColor)
+            colorAnimator.duration = 300 // Animation duration in milliseconds
+            colorAnimator.setEvaluator(ArgbEvaluator())
+            colorAnimator.addUpdateListener { animator ->
+                val animatedColor = animator.animatedValue as Int
+                layer.setTint(animatedColor)
+                currentGitColor = animatedColor
+                imageView.invalidateDrawable(drawable) // Ensure the drawable is redrawn
+            }
+            colorAnimator.start()
+            this.colorAnimator = colorAnimator
+        }
     }
 
 
