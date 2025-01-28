@@ -5,6 +5,10 @@
         android:icon="@drawable/baseline_clone_maker_24"
         android:title="Clone" />
     <item
+        android:id="@+id/revert"
+        android:icon="@drawable/baseline_restore_24"
+        android:title="Revert" />
+    <item
         android:id="@+id/checkout"
         android:icon="@drawable/baseline_coffee_24"
         android:title="Checkout" />

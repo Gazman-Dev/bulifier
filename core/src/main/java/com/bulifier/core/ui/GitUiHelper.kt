@@ -8,6 +8,7 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.view.forEach
 import androidx.core.view.isVisible
+import androidx.fragment.app.FragmentManager
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.BuildConfig
@@ -16,9 +17,9 @@ import com.bulifier.core.databinding.PopupCloneBinding
 import com.bulifier.core.databinding.PopupPushBinding
 import com.bulifier.core.git.GitError
 import com.bulifier.core.git.GitViewModel
+import com.bulifier.core.git.ui.CommitsDialogFragment
 import com.bulifier.core.ui.main.CheckoutDialogManager
 import com.bulifier.core.ui.main.MainViewModel
-import com.google.android.material.snackbar.Snackbar
 import kotlinx.coroutines.launch
 import org.eclipse.jgit.transport.CredentialItem
 import org.eclipse.jgit.transport.URIish
@@ -26,36 +27,19 @@ import org.eclipse.jgit.transport.UsernamePasswordCredentialsProvider
 
 class GitUiHelper(
     private val gitButton: View,
+    private val gitContainer: View,
     private val gitViewModel: GitViewModel,
     private val viewModel: MainViewModel,
-    private val lifeCycleOwner: LifecycleOwner
+    private val lifeCycleOwner: LifecycleOwner,
+    private val parentFragmentManager: FragmentManager
 ) {
 
     init {
-        gitButton.setOnClickListener {
-            PopupMenu(gitButton.context, gitButton).apply {
-                inflate(R.menu.git_menu)
-
-                val isCloneNeeded = gitViewModel.isCloneNeeded()
-                menu.forEach {
-                    it.isEnabled = !isCloneNeeded || it.itemId == R.id.clone
-                }
-
-                setForceShowIcon(true)
-                setOnMenuItemClickListener {
-                    when (it.itemId) {
-                        R.id.clone -> clone()
-                        R.id.checkout -> checkout()
-                        R.id.pull -> gitViewModel.pull()
-                        R.id.push -> gitViewModel.push()
-                        R.id.commit -> commit()
-                        R.id.clear -> clear()
-                        else -> Unit
-                    }
-                    true
-                }
-                show()
-            }
+//        gitButton.setOnClickListener {
+//            createPopup()
+//        }
+        gitContainer.setOnClickListener {
+            createPopup()
         }
 
         lifeCycleOwner.lifecycleScope.launch {
@@ -65,12 +49,38 @@ class GitUiHelper(
                 }
             }
         }
+    }
 
-        lifeCycleOwner.lifecycleScope.launch {
-            gitViewModel.gitUpdates.collect {
-                Snackbar.make(gitButton, it, Snackbar.LENGTH_SHORT).show()
+    private fun createPopup() {
+        PopupMenu(gitButton.context, gitButton).apply {
+            inflate(R.menu.git_menu)
+
+            val isCloneNeeded = gitViewModel.isCloneNeeded()
+            menu.forEach {
+                it.isEnabled = !isCloneNeeded || it.itemId == R.id.clone
             }
+
+            setForceShowIcon(true)
+            setOnMenuItemClickListener {
+                when (it.itemId) {
+                    R.id.clone -> clone()
+                    R.id.revert -> revert()
+                    R.id.checkout -> checkout()
+                    R.id.pull -> gitViewModel.pull()
+                    R.id.push -> gitViewModel.push()
+                    R.id.commit -> commit()
+                    R.id.clear -> clear()
+                    else -> Unit
+                }
+                true
+            }
+            show()
         }
+    }
+
+    private fun revert() {
+        val commitsDialog = CommitsDialogFragment()
+        commitsDialog.show(parentFragmentManager, "CommitsDialog")
     }
 
     private fun clear() {
@@ -80,7 +90,7 @@ class GitUiHelper(
             setPositiveButton("Clean") { _, _ ->
                 gitViewModel.clean()
             }
-            setCancelable(false)
+            setNegativeButton("Cancel", null)
             show()
         }
     }

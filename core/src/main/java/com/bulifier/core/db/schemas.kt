@@ -349,6 +349,9 @@ data class HistoryItem(
 
     @ColumnInfo(name = "error_message")
     val errorMessage: String? = null,
+
+    @ColumnInfo(name = "created")
+    var created: Date = Date()
 ) {
     @ColumnInfo(name = "last_updated")
     var lastUpdated: Date = Date()

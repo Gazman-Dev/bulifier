@@ -37,9 +37,12 @@ abstract class BaseHistoryViewHolder(
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
+            val agentPrefix = if(historyItem?.schema == "agent"){
+                "\uD83E\uDD16 "
+            }else ""
             val title = (viewModel.getErrorMessages(historyItem?.promptId ?: -1)
                 ?: historyItem?.prompt) ?: ""
-            binding.title.text = title.substring(0, min(title.length, 100))
+            binding.title.text = agentPrefix + title.substring(0, min(title.length, 100))
         }
         binding.deleteButton.setOnClickListener {
             historyItem?.let {

@@ -7,6 +7,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bulifier.core.R
 import com.bulifier.core.databinding.FileItemBinding
 import com.bulifier.core.db.File
+import com.bulifier.core.git.GitViewModel
+import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.ui.utils.showErrorDialog
 import com.bulifier.core.ui.utils.showTextDialog
@@ -15,6 +17,7 @@ import java.util.Locale
 class FileViewHolder(
     private val binding: FileItemBinding,
     private val viewModel: MainViewModel,
+    private val gitViewModel: GitViewModel,
 ) :
     RecyclerView.ViewHolder(binding.root) {
 
@@ -43,6 +46,10 @@ class FileViewHolder(
             "Rename/Move",
             "Delete"
         )
+        val addToGitRoot = "Add to git root"
+        if (!gitViewModel.isCloneNeeded() && !file.isFile) {
+            options.add(0, addToGitRoot)
+        }
         if (file.isFile) {
             options.add(0, "Copy Content")
         }
@@ -71,6 +78,10 @@ class FileViewHolder(
 
                     "Copy Content" -> {
                         viewModel.loadContentToClipboard(file.fileId)
+                    }
+
+                    addToGitRoot ->{
+                        SchemaModel.addRoot(file.path + "/" + file.fileName)
                     }
 
                     else -> throw Error("Options got messed up")
