@@ -1,5 +1,18 @@
 # Bulifier Release Notes
 
+## Release 2.2.19
+ - Updated items order in jobs scheduler, added `created` field and using that instead the `last_update`
+ - Added a revert view screen for git. You can revert to any commit from ui list
+ - Added autocommit option for agent, commit before agent is running
+ - Changed all the git notifications
+    - added the branch to top toolbar 
+    - added color indication for progress, success and error
+    - Removed the option to manually creating folders and files
+ - Added a new git_roots.settings file to manage sync with git. Only folders in the list are deleted before exporting db files to local git repo. This solve all the issues with deleting files
+    - Added a shortcut to add folders to git_roots from folders menu. It will auto figure if child folders needs to be removed or parent folder already added and this request is redundant
+
+
+
 ## Release 2.1.05
  - Updated schemas
    - updated bulify schema 
