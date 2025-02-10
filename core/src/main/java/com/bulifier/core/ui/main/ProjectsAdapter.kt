@@ -52,7 +52,7 @@ class ProjectsAdapter(
     }
 
     class ProjectViewHolder(val binding: ItemProjectBinding) :
-        RecyclerView.ViewHolder(binding.root)
+        RecyclerView.ViewHolder(binding.toolbar)
 
     object ProjectComparator : DiffUtil.ItemCallback<Project>() {
         override fun areItemsTheSame(oldItem: Project, newItem: Project): Boolean {

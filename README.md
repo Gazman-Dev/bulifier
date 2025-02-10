@@ -1,96 +1,118 @@
 # Welcome to Bulifier
 
-[![Watch the Demo](https://img.shields.io/badge/Watch-Demo-red)](https://www.youtube.com/watch?v=Q0iQKEnIRtI&t=2s)  
+[![Watch the Demo](https://img.shields.io/badge/Watch-Demo-red)](https://www.youtube.com/watch?v=ZZbraX6OFMg&ab_channel=Bulifier)  
 [![Get it on Google Play](https://img.shields.io/badge/Get_it_on-Google_Play-green)](https://play.google.com/store/apps/details?id=com.bulifier)  
 [![Visit Website](https://img.shields.io/badge/Visit-Website-blue)](https://bulifier.com/)  
 [![Release Notes](https://img.shields.io/badge/Release-Notes-orange)](https://chatgpt.com/c/RELEASE_NOTES.md)
 
-Bulifier is an **open-source**, **AI-powered mobile IDE** that shifts software development into a **bullet-point-driven workflow**:
+Bulifier is an **open-source**, **AI-powered mobile IDE** that shifts software development into a **bullet-point-driven workflow**. With the latest updates in version 2.3+, Bulifier now supports binary file handling and enhanced JavaScript integration – all designed to streamline your coding experience on mobile devices.
 
-1.  **Mobile-First Coding** – Seamlessly build, edit, and commit to your projects directly from a phone or tablet.
-2.  **Bullet Points as a Language** – Represent and refine your application’s logic as bullet points. The AI then generates and updates the raw source code under the hood.
+1. **Mobile-First Coding** – Seamlessly build, edit, and commit to your projects directly from a phone or tablet.
+2. **Bullet Points as a Language** – Represent and refine your application’s logic as bullet points. The AI then generates and updates the raw source code under the hood.
 
 ## Why Bullet Points?
 
-Bulifier is about **changing your perspective** on how you interact with code. You can capture the essence of your application in concise bullet points, making it easier for everyone—including AI—to read, reason, and refine, ensuring your project remains aligned with your goals.
+Bulifier is about **changing your perspective** on how you interact with code. Capture the essence of your application in concise bullet points, making it easier for everyone – including AI – to read, reason, and refine, ensuring your project stays perfectly aligned with your goals.
+
+----------
+
+## New in v2.3+: Binary File Support
+
+Starting with version 2.3+, Bulifier now supports binary files. This major update resolves deletion issues and eliminates the need for git configuration files. You can now display images, fonts, and other binary assets directly on your device, enriching your mobile development experience.  
+[Read more about binary support](https://bulifier.com/posts/001/)
 
 ----------
 
 ## Key Features
 
-1.  **Mobile IDE**
+1. **Mobile IDE**
+    - Develop on-the-go with robust Git integration (clone, pull, push, commit, etc.).
+    - Write and maintain your application logic without a full desktop environment.
 
-    -   Develop on-the-go with robust Git integration (clone, pull, push, commit, etc.).
-    -   Write and maintain your application logic without needing a full desktop environment.
-2.  **Bullet-Point Development**
+2. **Bullet-Point Development**
+    - Outline your ideas in natural-language bullet points.
+    - Let the AI handle creating or updating the underlying source code.
 
-    -   Outline your ideas in natural-language bullet points.
-    -   Let the AI take care of creating or updating the underlying source code.
-3.  **Agentic Flow**
+3. **Agentic Flow**
+    - Invoke the **Agent** to execute multiple commands in a single operation.
+    - Whether you’re adding new features, reorganizing your project structure, or refining logic, the Agent automatically selects the best schemas and context.
 
-    -   Invoke the **Agent** to execute multiple commands in a single operation.
-    -   Whether you’re adding a new feature, reorganizing project structure, or refining logic, the Agent selects the best schemas and context automatically.
-4.  **Sync**
+4. **Sync**
+    - **Two Sync Actions**:
+        - Generate or update **raw code** from bullet points.
+        - Update **bullet points** based on the current raw code.
+    - Choose to sync only the components you’ve changed or apply a broader update across the project.
 
-    -   **Two Sync Actions**:
-        -   Generate or update **raw code** from bullet points.
-        -   Update **bullet points** based on the current raw code.
-    -   Sync only the components you’ve changed, or apply a broader update to everything.
+5. **Binary File Support (v2.3+)**
+    - Display images, fonts, and other binary files directly on your device.
+    - Overcome issues with file deletion and simplify configuration management.
+    - **No more need for git config files.**
+
+6. **Templates and Schema Customization**
+    - Kickstart your projects with ready-to-use templates—including a JS template—available in both the open source and Play Store versions.
+    - Templates provide startup files for your project, setting the foundation for your development.
+    - Deep schema customization lets you tailor AI requests to suit the specific needs of each template, making it a powerful tool to optimize your workflow.
 
 ----------
 
 ## The Play Store Version
 
-You can also experience Bulifier as a ready-to-use app from the Google Play Store. This version uses a **Firebase Real-time Database** as an AI proxy, providing:
+Experience Bulifier as a ready-to-use app from the [Google Play Store](https://play.google.com/store/apps/details?id=com.bulifier). This version uses a **Firebase Real-time Database** as an AI proxy for enhanced performance and includes:
 
--   **Excellent Offline Support** – Keep working even when you’re offline.
--   **Faster Parallel Execution** – Especially noticeable when using the Agentic Flow.
--   **All Open-Source Business Logic** – Everything critical remains open source here in this repository.
+- **Excellent Offline Support** – Keep working even without an internet connection.
+- **Faster Parallel Execution** – Especially effective when using Agentic Flow.
+- **Exclusive JavaScript Integration:**
+    - **Run JS Code on Device:** Execute JavaScript code natively on Android.
+    - **NPM Dependencies:** Manage NPM packages with our dedicated Bulifier-NPM client.
+    - **Real-Time Console Logs:** Monitor JS execution live.
+    - **Project Sharing:** Export entire projects as zipped files for sharing via Android’s native sharing functionality or Git.
+- **Pre-Built Templates:**
+    - Utilize pre-built project templates (including the JS template) available in both versions for rapid project startup and schema customization.
 
-If you prefer a more direct approach or want to experiment with your own keys, you can stick to the open-source version in this repo. Either way, all of Bulifier’s core features are at your fingertips.
+**Note:** While the advanced JS integration features – such as on-device JS execution, NPM dependency management, and live console logs – are exclusive to the Play Store version, the core templates and schema customization functionality remain fully open source.
+
+**Open Source Policy Update:**  
+Our new policy ensures that **all AI-related business logic remains fully open source**. However, advanced features like on-device JS execution and Firebase proxying for AI requests are exclusive to the Play Store app.  
+[Learn more about our open source policy changes](https://bulifier.com/posts/open-source-policy-update/)
+
+If you prefer a more direct approach or wish to experiment with your own API keys, you can stick to the open-source version available in this repository. Either way, all of Bulifier’s core features are at your fingertips.
 
 ----------
 
 ## Getting Started
 
-1.  **Install from the [Google Play Store](https://play.google.com/store/apps/details?id=com.bulifier).**
-2.  **Or build from this repo**:
-    -   Clone the project
-    -   Open in Android Studio
-    -   Run the demo module
-    -   Start exploring Bulifier
+1. **Install from the [Google Play Store](https://play.google.com/store/apps/details?id=com.bulifier).**
+2. **Or build from this repo:**
+    - Clone the project.
+    - Open in Android Studio.
+    - Run the demo module.
+    - Start exploring Bulifier.
 
 ----------
 
 ## Technical Details
 
--   **AI Requests**
-    -   **Open Source**: Direct API calls with your own keys (e.g., GPT, Claude).
-    -   **Play Store**: Via Firebase Real-time Database as a backend proxy to safeguard keys.
--   **Bullet-Point to Code** – The bullet-point layer is your main interface; Bulifier handles the conversions to raw files automatically.
--   **Open Source & Licensing** – Bulifier is published under the Apache License 2.0. It uses a modified version of JGit under the Eclipse Distribution License 1.0.
--  **Schemas**
-   Schemas are the prompt engineering, it powers the agent and allows you to call them manually. You can also create new schemas or update the existing one.
-    -   **`update-bullet-with-raw`**  
-        Uses your existing raw files to update the corresponding bullet points. This way, if code is changed manually or elsewhere, your bullet-point representation stays accurate.
-
-    -   **`update-raw-with-bullet`**  
-        Converts or updates raw files based on the latest bullet points. Ideal for generating new files or merging new logic back into existing code.
-
-    -   **`debulify-file`**  
-        Translates bullet points into code at the file level. Perfect for situations where you only want to convert (or reconvert) specific sections or modules of your project.
-
-    -   **`rebulify-file`**  
-        Adjusts bullet points by reading the current state of a file’s code, ensuring your high-level outline matches the latest version of that file.
+- **AI Requests:**
+    - **Open Source:** Direct API calls with your own keys (e.g., GPT, Claude).
+    - **Play Store:** Via Firebase Real-time Database as a backend proxy to safeguard keys.
+- **Bullet-Point to Code:**  
+  The bullet-point layer serves as your main interface; Bulifier automatically handles the conversion to raw files.
+- **Open Source & Licensing:**  
+  Bulifier is published under the Apache License 2.0 and includes a modified version of JGit (under the Eclipse Distribution License 1.0).
+- **Schemas:**  
+  Schemas are the prompt engineering behind the AI Agent. They power operations and can be customized or extended:
+    - **`update-bullet-with-raw`**: Uses raw files to update bullet points.
+    - **`update-raw-with-bullet`**: Converts bullet points into raw files.
+    - **`debulify-file`**: Translates bullet points into code at the file level.
+    - **`rebulify-file`**: Updates bullet points based on a file’s current code.
 
 ----------
 
 ## Contributing
 
-We welcome feedback and contributions:
-
--   Submit issues for bugs or feature requests
--   Open pull requests to enhance the platform or fix problems
+We welcome your feedback and contributions:
+- Submit issues for bugs or feature requests.
+- Open pull requests to enhance the platform or fix problems.
 
 ----------
 
@@ -102,4 +124,5 @@ Includes a modified version of **JGit** (under the Eclipse Distribution License 
 
 ----------
 
-**Thanks for checking out Bulifier!** We aim to offer a _fresh, AI-centric perspective_ on coding—one that feels natural for developers and fosters collaboration, all while being fully accessible on mobile devices. Your feedback and ideas are always welcome.
+**Thanks for checking out Bulifier!**  
+We aim to offer a _fresh, AI-centric perspective_ on coding—one that feels natural for developers and fosters collaboration, all while being fully accessible on mobile devices. Your feedback and ideas are always welcome.

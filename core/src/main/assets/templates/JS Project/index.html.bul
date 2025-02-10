@@ -1,0 +1,13 @@
+- Purpose: Entry point for the game, container for Phaser game and dependencies.
+- Structure:
+  - HTML5 doctype with head
+    - title: Birdy
+    - charset: UTF-8
+    - styles: css/styles.css
+  - Body contains:
+    - game-container div for Phaser rendering
+    - Preserved <!-- Vendor libraries --> comment
+    - Script tags:
+      - js/main.js
+      - js/splash.js
+      - js/game.js

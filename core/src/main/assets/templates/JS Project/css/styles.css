@@ -1,0 +1,33 @@
+/* Import your special fonts */
+@font-face {
+  font-family: 'SpecialFont';
+  src: url('../assets/fonts/SuperShiny.ttf') format('truetype');
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #222;
+  color: #fff;
+  font-family: 'SpecialFont', sans-serif;
+}
+
+#game-container {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* Styling for splash screen text */
+.splash-text {
+  font-size: 48px;
+  text-align: center;
+  margin-top: 20%;
+}
+
+.splash-icon {
+  display: block;
+  margin: 20px auto;
+  width: 150px;
+  height: auto;
+}

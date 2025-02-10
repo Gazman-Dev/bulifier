@@ -3,6 +3,7 @@ package com.bulifier.core.ui.main
 import android.animation.ArgbEvaluator
 import android.animation.ObjectAnimator
 import android.animation.ValueAnimator
+import android.annotation.SuppressLint
 import android.graphics.drawable.LayerDrawable
 import android.os.Bundle
 import android.text.SpannableString
@@ -54,6 +55,8 @@ import kotlin.getValue
 
 data class TitleAction(val title: String, val action: () -> Unit)
 
+const val KEY_FILE_MODE = "fileMode"
+
 @AndroidEntryPoint
 class MainFragment : BaseFragment<MainFragmentBinding>() {
 
@@ -63,9 +66,13 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
     private val viewModel by activityViewModels<MainViewModel>()
     private val historyModel by activityViewModels<HistoryViewModel>()
     private val gitViewModel by activityViewModels<GitViewModel>()
-    private val filesAdapter by lazy { FilesAdapter(viewModel, gitViewModel) }
+    private lateinit var filesAdapter: FilesAdapter
     private var currentGitColor = Color.Transparent.toArgb()
     private var colorAnimator: ValueAnimator? = null
+
+    private val isFileMode by lazy {
+        arguments?.getBoolean(KEY_FILE_MODE) == true
+    }
 
 
     private val security by lazy {
@@ -80,6 +87,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, null)
+
         binding.toolbar.settings.setOnClickListener {
             PopupMenu(requireContext(), binding.toolbar.settings).apply {
                 inflate(R.menu.settings_menu)
@@ -98,6 +106,8 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         }
 
         binding.recyclerView.layoutManager = LinearLayoutManager(requireContext())
+
+        filesAdapter = FilesAdapter(viewModel, viewLifecycleOwner.lifecycleScope)
         binding.recyclerView.adapter = filesAdapter
 
         binding.reloadSchemasButton.setOnClickListener {
@@ -170,10 +180,15 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
                 }
             }
         }
+
+        if(isFileMode){
+            updateFileContentView(viewModel.openedFile.value != null)
+        }
     }
 
     private var dotJob: Job? = null
 
+    @SuppressLint("SetTextI18n")
     private fun startDotAnimation(textView: TextView, progress: Double) {
         dotJob?.cancel() // Cancel any existing animation job
         dotJob = viewLifecycleOwner.lifecycleScope.launch {
@@ -287,19 +302,35 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
 
         viewLifecycleOwner.lifecycleScope.launch {
             launch {
-                viewModel.openedFile.collect {
-                    val showFileContent = it != null
-                    binding.recyclerView.isVisible = !showFileContent
-                    binding.fileContent.isVisible = showFileContent
+                viewModel.openedFile.collect { openedFile ->
+                    updateFileContentView(openedFile != null)
                 }
             }
 
             launch {
-                viewModel.pagingDataFlow.collect { pagingData ->
+                Prefs.template.flow.collectLatest { template ->
+                    updateFileContentView(viewModel.openedFile.value != null)
+                }
+            }
+
+            launch {
+                viewModel.pagingDataFlow.collectLatest { pagingData ->
                     filesAdapter.submitData(lifecycle, pagingData)
                 }
             }
         }
+    }
+
+    private fun updateFileContentView(isFileOpen: Boolean) {
+        if(isFileMode && !isFileOpen){
+            findNavController().popBackStack()
+            return
+        }
+        binding.recyclerView.isVisible = !isFileOpen
+        binding.fileContent.isVisible = isFileOpen
+
+        uiVerifier.verifyRunButton(binding.runButton, isFileOpen)
+        uiVerifier.verifyReleaseButton(binding.releaseButton, isFileOpen)
     }
 
     private fun registerPath() {

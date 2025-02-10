@@ -6,12 +6,12 @@ import androidx.paging.PagingDataAdapter
 import androidx.recyclerview.widget.DiffUtil
 import com.bulifier.core.databinding.FileItemBinding
 import com.bulifier.core.db.File
-import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.ui.main.MainViewModel
+import kotlinx.coroutines.CoroutineScope
 
 class FilesAdapter(
     private val viewModel: MainViewModel,
-    private val gitViewModel: GitViewModel
+    private val uiScope: CoroutineScope
 ) : PagingDataAdapter<File, FileViewHolder>(DIFF_CALLBACK) {
 
     companion object {
@@ -30,7 +30,7 @@ class FilesAdapter(
         val inflater = LayoutInflater.from(parent.context)
 
         val binding = FileItemBinding.inflate(inflater, parent, false)
-        return FileViewHolder(binding, viewModel, gitViewModel)
+        return FileViewHolder(binding, viewModel, uiScope)
     }
 
     override fun onBindViewHolder(holder: FileViewHolder, position: Int) {

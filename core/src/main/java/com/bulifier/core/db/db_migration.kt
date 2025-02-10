@@ -3,7 +3,7 @@ package com.bulifier.core.db
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-const val DB_VERSION = 10
+const val DB_VERSION = 12
 
 private val migrationFunctions = arrayOf<(SupportSQLiteDatabase) -> Unit>(
     {
@@ -121,6 +121,12 @@ private val migrationFunctions = arrayOf<(SupportSQLiteDatabase) -> Unit>(
     },
     {
         it.execSQL("ALTER TABLE history ADD COLUMN created INTEGER NOT NULL DEFAULT 0")
+    },
+    {
+        it.execSQL("ALTER TABLE projects ADD COLUMN template TEXT")
+    },
+    {
+        it.execSQL("ALTER TABLE files ADD COLUMN is_binary INTEGER NOT NULL DEFAULT 0")
     }
 )
 

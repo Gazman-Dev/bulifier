@@ -12,8 +12,14 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.Transaction
 import androidx.room.Update
+import com.bulifier.core.utils.Logger
+import isTextAsset
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.withContext
+import java.io.InputStream
 import java.nio.charset.StandardCharsets
+import kotlin.io.outputStream
 
 @Dao
 interface FileDao {
@@ -23,14 +29,22 @@ interface FileDao {
         context: Context,
         projectId: Long,
         clearOldFiles: Boolean
-    ) =
-        DbSyncHelper(context).exportProject(projectId, clearOldFiles)
+    ) = DbSyncHelper(context).exportProject(projectId, clearOldFiles)
+
+    @Transaction
+    suspend fun dbToFolder(
+        context: Context,
+        projectId: Long,
+        destination: java.io.File,
+        clearOldFiles: Boolean,
+        extensionsBlackList:List<String>,
+    ) = DbSyncHelper(context).exportProject(projectId, destination, clearOldFiles, extensionsBlackList)
 
     @Transaction
     suspend fun localToDb(context: Context, projectId: Long) =
         DbSyncHelper(context).importProject(projectId)
 
-    @Query("SELECT * FROM files WHERE path = :path and to_delete = 0 AND project_id = :projectId")
+    @Query("SELECT * FROM files WHERE path = :path and not to_delete AND project_id = :projectId order by is_file, file_name ")
     fun fetchFilesByPathAndProjectId(path: String, projectId: Long): PagingSource<Int, File>
 
     @Query(
@@ -116,14 +130,14 @@ interface FileDao {
     suspend fun updateContent(content: Content): Int
 
     @Query("UPDATE files SET size = :size, hash = :hash, sync_hash = :syncHash WHERE file_id = :fileId")
-    suspend fun updateFileMetaData(fileId: Long, size: Int, hash: Long, syncHash: Long)
+    suspend fun updateFileMetaData(fileId: Long, size: Long, hash: Long, syncHash: Long)
 
     @Transaction
     suspend fun insertContentAndUpdateFileMetaData(content: Content, syncHash: Long = -1) {
         upsertContent(content)
         updateFileMetaData(
             content.fileId,
-            content.content.length,
+            content.content.length.toLong(),
             calculateStringHash(content.content),
             syncHash
         )
@@ -134,7 +148,7 @@ interface FileDao {
         val count = updateContent(content)
         updateFileMetaData(
             content.fileId,
-            content.content.length,
+            content.content.length.toLong(),
             calculateStringHash(content.content),
             syncHash
         )
@@ -171,16 +185,99 @@ interface FileDao {
     @Insert(onConflict = OnConflictStrategy.Companion.IGNORE)
     suspend fun insertProject(project: Project): Long
 
-    @Query("select * from projects order by last_updated desc")
-    fun fetchProjects(): PagingSource<Int, Project>
-
     @Transaction
-    suspend fun createProjectAndRoot(project: Project, defaultFiles: Array<File>) {
+    suspend fun createProject(context: Context, project: Project, logger: Logger): Long {
         val projectId = insertProject(project)
-        defaultFiles.forEach {
-            insertFile(it.copy(projectId = projectId))
+        if (project.template == null) {
+            return projectId
+        }
+
+        val templatePath = "templates/${project.template}".trim()
+        loadTemplateFiles(
+            context = context,
+            projectId = projectId,
+            templatePath = templatePath,
+            logger = logger
+        )
+        return projectId
+    }
+
+    private suspend fun loadTemplateFiles(
+        context: Context,
+        projectId: Long,
+        templatePath: String,
+        parentPath: String = "",
+        logger: Logger
+    ): Unit = withContext(Dispatchers.IO) {
+        val assetFiles = try {
+            context.assets.list(templatePath) ?: return@withContext
+        } catch (e: Exception) {
+            logger.e("error loadTemplateFiles", e)
+            return@withContext
+        }
+
+        for (file in assetFiles) {
+            val isFile = file.contains(".")
+            val fullPath = "$templatePath/$file"
+
+            val isBinary = isFile && !context.assets.isTextAsset(fullPath)
+
+            val fileId = insertFile(
+                File(
+                    fileName = file,
+                    projectId = projectId,
+                    isFile = isFile,
+                    path = parentPath,
+                    isBinary = isBinary
+                )
+            )
+
+            if (isFile) {
+                if (isBinary) {
+                    val destination: java.io.File = getBinaryFile(context, fileId, projectId)
+                    val inputStream = context.assets.open(fullPath)
+                    val size = copyStreamToFile(inputStream, destination)
+                    updateFileMetaData(fileId, size, -1L, -1L)
+                } else {
+                    val content = context.assets.open(fullPath).bufferedReader()
+                        .use { it.readText() }
+                    insertContentAndUpdateFileMetaData(
+                        Content(fileId = fileId, content = content)
+                    )
+                }
+            } else {
+                loadTemplateFiles(
+                    context,
+                    projectId,
+                    "$templatePath/$file",
+                    if (parentPath.isEmpty()) file else "$parentPath/$file",
+                    logger
+                )
+            }
+        }
+
+    }
+
+    private fun copyStreamToFile(inputStream: InputStream, destination: java.io.File): Long {
+        // Ensure the parent directories exist
+        destination.parentFile?.mkdirs()
+
+        // Delete the destination file if it exists (overwrite behavior)
+        if (destination.exists()) {
+            destination.delete()
+        }
+
+        // Use Kotlin's extension functions to auto-close streams and copy data.
+        return inputStream.use { input ->
+            destination.outputStream().use { output ->
+                input.copyTo(output)  // returns the total number of bytes copied
+            }
         }
     }
+
+
+    @Query("select * from projects order by last_updated desc")
+    fun fetchProjects(): PagingSource<Int, Project>
 
     @Query(
         """SELECT 
@@ -411,19 +508,36 @@ interface FileDao {
 
     @Query(
         """
+    SELECT 
+        files.file_id, 
+        files.file_name, 
+        files.path, 
+        files.is_file, 
+        contents.*
+    FROM files
+        JOIN contents ON files.file_id = contents.file_id
+    WHERE files.project_id = :projectId 
+        AND files.to_delete = 0
+        AND (
+            LOWER(SUBSTR(files.file_name, INSTR(files.file_name, '.') + 1)) NOT IN (:blacklist)
+            OR INSTR(files.file_name, '.') = 0  -- Allow files without extensions
+        )
+    ORDER BY files.file_id ASC
+    """
+    )
+    suspend fun exportFilesAndContents(projectId: Long, blacklist: List<String>): List<FileData>
+
+
+    @Query(
+        """
         SELECT 
-            files.file_id, 
-            files.file_name, 
-            files.path, 
-            files.is_file, 
-            contents.*
+            *
         FROM files
-            JOIN contents ON files.file_id = contents.file_id
-        WHERE files.project_id = :projectId and files.to_delete = 0
+        WHERE project_id = :projectId and is_binary
         ORDER BY files.file_id ASC
     """
     )
-    suspend fun exportFilesAndContents(projectId: Long): List<FileData>
+    suspend fun exportBinaryFiles(projectId: Long): List<File>
 
     @Query("DELETE FROM files WHERE project_id = :projectId")
     suspend fun deleteFilesByProjectId(projectId: Long)
@@ -449,8 +563,16 @@ interface FileDao {
     @Query("SELECT count(*) > 0 FROM projects WHERE project_name = :projectName")
     suspend fun isProjectExists(projectName: String): Boolean
 
+    @Query("SELECT project_name FROM projects")
+    suspend fun projectNames(): List<String>
+
     private fun calculateStringHash(input: String): Long {
         checksum.update(input.toByteArray(StandardCharsets.UTF_8))
         return checksum.value
+    }
+
+    @Transaction
+    suspend fun transaction(function: suspend () -> Unit) {
+        function()
     }
 }

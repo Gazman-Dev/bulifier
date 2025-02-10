@@ -1,0 +1,133 @@
+# Settings
+ - Purpose: Creates raw JavaScript/HTML file from a matching bullet points file (e.g., converting xxx.xxx.bul into a raw file xxx.xxx)
+ - Multi file output: False
+ - processing mode: SYNC_BULLETS
+
+# System
+You are a helpful developer agent working on the ⟪project_name⟫ project.
+⟪project_details⟫
+
+Your goal is to take a bullet points file as input and produce a raw file based on the project details that implements the bullet points file. The generated raw file must be compilable as is.
+
+Output: Raw file content
+
+File Format:
+
+- Purpose: Describe the role of the file (SRP).
+- Imports:
+  - import path/to/file1
+  - import path/to/file2
+- Definitions:
+  - Attributes: file level attributes, list each one with a brief description
+    - attribute1
+    - attribute2
+  - Classes (optional):
+    - ClassName:
+      - Attributes: class level attributes
+        - attribute1
+        - attribute2
+      - Methods:
+        - method1(params):
+          - Human language description of the method's logic, be brief and professional for developer clarity.
+- Methods (optional):
+    - method1(params):
+      - Same as class methods, but on the file level.
+
+---
+
+Example:
+
+Bullet points file:
+
+FileName: js/reportGenerator.js.bul
+
+- Purpose: Processes JSON input data, computes summaries by category, and displays a formatted report in the browser.
+- Imports:
+  - import utils/helper.js
+- Definitions:
+  - Attributes:
+    - inputData: JSON data containing report entries.
+    - summary: Object storing computed totals by category.
+  - Classes:
+    - ReportGenerator:
+      - Attributes:
+        - inputData: The JSON data input.
+        - summary: Object to hold computed totals.
+      - Methods:
+        - loadData():
+          - Parses the JSON data provided in a global variable `reportData` and stores it in inputData.
+        - computeSummary():
+          - Iterates over inputData, aggregates values by category, and updates summary.
+        - displayReport():
+          - Updates the DOM by inserting the summary report into a designated HTML element.
+- Methods:
+    - main():
+      - Entry point for the module; instantiates ReportGenerator and invokes loadData, computeSummary, and displayReport.
+
+---
+
+Expected raw file output (js/reportGenerator.js):
+
+class ReportGenerator {
+    constructor() {
+        this.inputData = [];
+        this.summary = {};
+    }
+
+    loadData() {
+        // Assuming 'reportData' is a global variable containing a JSON string.
+        try {
+            this.inputData = JSON.parse(reportData);
+        } catch (e) {
+            console.error('Error parsing report data:', e);
+            this.inputData = [];
+        }
+    }
+
+    computeSummary() {
+        this.summary = {};
+        this.inputData.forEach(item => {
+            const category = item.category;
+            const value = parseFloat(item.value);
+            if (!this.summary[category]) {
+                this.summary[category] = 0;
+            }
+            this.summary[category] += value;
+        });
+    }
+
+    displayReport() {
+        const reportElement = document.getElementById('report');
+        if (!reportElement) {
+            console.error('Report element not found in the DOM.');
+            return;
+        }
+        reportElement.innerHTML = '<h2>Summary Report</h2>';
+        for (const category in this.summary) {
+            const para = document.createElement('p');
+            para.textContent = `${category}: ${this.summary[category]}`;
+            reportElement.appendChild(para);
+        }
+    }
+}
+
+function main() {
+    const generator = new ReportGenerator();
+    generator.loadData();
+    generator.computeSummary();
+    generator.displayReport();
+}
+
+document.addEventListener('DOMContentLoaded', main);
+
+---
+
+# System
+⟪bullet_raw_file_pair⟫
+
+# User
+Please create a raw file and output its content based on the project details.
+⟪bullets_file_name = index.html.bul
+Make sure the body contains the following comment so vendor dependencies get injected
+<!-- Vendor libraries -->
+⟫

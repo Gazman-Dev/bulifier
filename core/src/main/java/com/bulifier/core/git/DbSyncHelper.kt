@@ -1,10 +1,14 @@
 import android.content.Context
+import android.content.res.AssetManager
+import android.util.Log
 import com.bulifier.core.db.Content
-import com.bulifier.core.db.FileData
 import com.bulifier.core.db.db
-import com.bulifier.core.schemas.SchemaModel
+import com.bulifier.core.db.getBinaryFile
 import java.io.File
+import java.io.InputStream
 import com.bulifier.core.db.File as DbFile
+
+private const val MAX_FILE_SIZE = 1024 * 40
 
 class DbSyncHelper(
     private val context: Context
@@ -19,10 +23,14 @@ class DbSyncHelper(
         // Define the project directory
         val projectDir = File(context.filesDir, projectName)
 
+
+        File(context.filesDir, "binary/$projectId").deleteRecursively()
         db.fileDao().deleteFilesByProjectId(projectId)
+
 
         processDirectory(projectDir, "", projectId)
     }
+
 
     private suspend fun processDirectory(currentDir: File, parentPath: String, projectId: Long) {
         if (!currentDir.exists()) return
@@ -30,15 +38,13 @@ class DbSyncHelper(
         currentDir.listFiles()?.forEach { file ->
             val fileName = file.name
             val isFile = file.isFile
-            val size = if (isFile) file.length().toInt() else 0
+            val size = if (isFile) file.length() else 0
             val path = parentPath
 
             if (fileName.lowercase().trim() == ".git") {
                 return@forEach
             }
-            if (isFile && !isTextFile(file)) {
-                return@forEach
-            }
+            val isBinary = isFile && !isTextFile(file)
 
             // Create and insert the File entity
             val fileEntity = DbFile(
@@ -46,18 +52,22 @@ class DbSyncHelper(
                 path = path,
                 fileName = fileName,
                 isFile = isFile,
-                size = size
+                size = size,
+                isBinary = isBinary
             )
             val fileId = db.fileDao().insertFile(fileEntity)
 
             if (isFile) {
-                val content = file.readText()
-                val contentEntity = Content(
-                    fileId = fileId,
-                    content = content,
-                    type = Content.Type.NONE // Adjust the type as needed
-                )
-                db.fileDao().insertContent(contentEntity)
+                if (isBinary) {
+                    file.copyTo(getBinaryFile(context, fileId, projectId), overwrite = true)
+                } else {
+                    val content = file.readText()
+                    val contentEntity = Content(
+                        fileId = fileId,
+                        content = content
+                    )
+                    db.fileDao().insertContent(contentEntity)
+                }
             } else {
                 // Insert the directory with isFile = false
                 // Calculate the new parent path
@@ -76,21 +86,55 @@ class DbSyncHelper(
             context.filesDir.mkdirs()
         }
 
-        if(clearOldFiles) {
-            SchemaModel.getRoots(projectId)?.forEach {
-                deleteAllFilesInFolder(File(srcDir, it))
-            }
+        exportProject(projectId, srcDir, clearOldFiles)
+    }
+
+    suspend fun exportProject(
+        projectId: Long,
+        destination: File,
+        clearOldFiles: Boolean,
+        extensionsBlackList: List<String> = emptyList(),
+    ) {
+        if (clearOldFiles) {
+            deleteFilesExceptGit(destination)
         }
 
-        val files: List<FileData> = db.fileDao().exportFilesAndContents(projectId)
-        files.forEach { fileData ->
+        db.fileDao().exportFilesAndContents(projectId, extensionsBlackList).forEach { fileData ->
             exportFile(
-                baseDir = srcDir,
+                baseDir = destination,
                 relativePath = fileData.path,
                 fileName = fileData.fileName,
                 content = fileData.content,
                 isFile = fileData.isFile
             )
+        }
+
+        db.fileDao().exportBinaryFiles(projectId).forEach {
+            val fileDestination = if (it.path.isEmpty()) {
+                it.fileName
+            } else {
+                "${it.path}/${it.fileName}"
+            }
+            val binaryFile = it.getBinaryFile(context)
+            try {
+                binaryFile.copyTo(File(destination, fileDestination), overwrite = true)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    private fun deleteFilesExceptGit(directory: File) {
+        if (!directory.exists() || !directory.isDirectory) return
+
+        directory.listFiles()?.forEach { file ->
+            if (file.name != ".git") {
+                if (file.isDirectory) {
+                    file.deleteRecursively()
+                } else {
+                    file.delete()
+                }
+            }
         }
     }
 
@@ -117,53 +161,53 @@ class DbSyncHelper(
     }
 }
 
-fun deleteAllFilesInFolder(folder: File) {
-    if (folder.isDirectory) {
-        val files = folder.listFiles()
-        if (files != null) {
-            for (file in files) {
-                if (file.isDirectory) {
-                    deleteAllFilesInFolder(file)
-                    file.delete()
-                } else {
-                    file.delete()
-                }
-            }
-        }
+fun isTextFile(file: File): Boolean {
+    val length = file.length()
+    if (length == 0L) {
+        return true
+    }
+    return length < MAX_FILE_SIZE && file.inputStream()
+        .use { inputStream -> isTextStream(inputStream) }
+}
+
+fun AssetManager.isTextAsset(fileName: String): Boolean {
+    return open(fileName).use { inputStream ->
+        inputStream.available() == 0 || isTextStream(inputStream)
     }
 }
 
-fun isTextFile(file: File, sampleSize: Int = 1024): Boolean {
+private fun isTextStream(inputStream: InputStream, sampleSize: Int = 1024): Boolean {
     return try {
         val buffer = ByteArray(sampleSize)
-        val inputStream = file.inputStream()
         val bytesRead = inputStream.read(buffer)
-        inputStream.close()
 
         // Check each character in the buffer
-        buffer.take(bytesRead).forEach { byte ->
-            if (!byte.toInt().toChar().isPrintable()) {
-                return false // Immediately reject if a non-printable character is found
-            }
-        }
-        true // If no non-printable characters are found, it's a text file
+        buffer.take(bytesRead).all { byte -> byte.toInt().toChar().isPrintable() }
     } catch (e: Exception) {
         e.printStackTrace()
-        false // Treat exceptions as non-printable (e.g., file read errors)
+        false // Handle file read errors
     }
 }
 
 // Updated isPrintable function
 fun Char.isPrintable(): Boolean {
     val codePoint = this.code
-    return this in '\u0020'..'\u007E' || // Basic ASCII
+    val printable = this in '\u0020'..'\u007E' || // Basic ASCII
             this in '\u00A0'..'\u00FF' || // Latin-1 Supplement
+            this in '\u27EA'..'\u27EB' || // Allow ⟪ and ⟫
+            this in '\u2018'..'\u201F' || // Typographic quotation marks (‘’ “” „)
+            this == '\u2013' || this == '\u2014' || // En dash (–) & Em dash (—)
             this.isLetterOrDigit() || // Letters and digits from all scripts
             this.isWhitespace() || // Space, tab, etc.
+            codePoint == 65506 || // Allow full-width tilde
             (codePoint in 0x1F300..0x1F5FF) || // Miscellaneous Symbols and Pictographs
             (codePoint in 0x1F600..0x1F64F) || // Emoticons
             (codePoint in 0x1F680..0x1F6FF) || // Transport and Map Symbols
             (codePoint in 0x2600..0x26FF) || // Miscellaneous Symbols
-            (codePoint in 0x2700..0x27BF) // Dingbats
+            (codePoint in 0x2700..0x27BF)
+    if (!printable) {
+        Log.d("isPrintable", "Non-printable character: $this ($codePoint)")
+    }
+    return printable // Dingbats
 }
 

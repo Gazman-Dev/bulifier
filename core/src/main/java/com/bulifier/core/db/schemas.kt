@@ -1,5 +1,6 @@
 package com.bulifier.core.db
 
+import android.content.Context
 import androidx.annotation.Keep
 import androidx.room.ColumnInfo
 import androidx.room.Database
@@ -100,6 +101,9 @@ data class Project(
 
     @ColumnInfo(name = "project_details")
     val projectDetails: String? = null,
+
+    @ColumnInfo(name = "template")
+    val template: String? = null,
 
     @ColumnInfo(name = "last_updated")
     var lastUpdated: Date = Date()
@@ -260,7 +264,7 @@ data class File(
     val isFile: Boolean,
 
     @ColumnInfo(name = "size")
-    val size: Int = 0,
+    val size: Long = 0,
 
     @ColumnInfo(name = "hash")
     val hash: Long = -1,
@@ -270,7 +274,15 @@ data class File(
 
     @ColumnInfo(name = "to_delete")
     val delete: Boolean = false,
-)
+
+    @ColumnInfo(name = "is_binary")
+    val isBinary: Boolean = false,
+){
+    fun getBinaryFile(context: Context) = getBinaryFile(context, fileId, projectId)
+}
+
+fun getBinaryFile(context: Context, fileId: Long, projectId: Long = Prefs.projectId.flow.value) =
+    java.io.File(context.filesDir, "binary/$projectId/$fileId")
 
 @Entity(
     tableName = "contents",
@@ -290,6 +302,7 @@ data class Content(
     @ColumnInfo(name = "content")
     val content: String = "",
 
+    @Deprecated("Not used anymore")
     @ColumnInfo(name = "type")
     val type: Type = Type.NONE
 ) {

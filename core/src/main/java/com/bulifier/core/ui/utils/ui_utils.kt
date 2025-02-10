@@ -1,11 +1,8 @@
 package com.bulifier.core.ui.utils
 
-import android.animation.ValueAnimator
 import android.content.Context
 import android.view.View
 import android.view.inputmethod.InputMethodManager
-import androidx.core.animation.doOnEnd
-import com.bulifier.core.R
 
 fun View.hideKeyboard() {
     val inputMethodManager =
@@ -46,3 +43,35 @@ fun <A : Any?, B : Any?, C : Any?, D : Any?> letAll(
 fun dpToPx(dp: Float, context: Context): Int {
     return (dp * context.resources.displayMetrics.density).toInt()
 }
+
+fun getFileType(fileName: String): FileType {
+    val extension = fileName.substringAfterLast('.', "").lowercase()
+
+    return when (extension) {
+        // Image extensions (compatible with Glide and typical image formats)
+        in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "heic", "heif") -> FileType.IMAGE
+
+        // Video extensions
+        in setOf("mp4", "mkv", "avi", "webm", "mov", "3gp") -> FileType.VIDEO
+
+        // Font extensions
+        in setOf("ttf", "otf", "woff", "woff2") -> FileType.FONT
+
+        // PDF
+        "pdf" -> FileType.PDF
+
+        // Everything else
+        else -> FileType.OTHER
+    }
+}
+
+
+enum class FileType {
+    IMAGE,
+    VIDEO,
+    FONT,
+    PDF,
+    OTHER
+}
+
+

@@ -11,7 +11,6 @@ import com.bulifier.core.prefs.Prefs.projectId
 import com.bulifier.core.prefs.Prefs.projectName
 import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.utils.Logger
-import deleteAllFilesInFolder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
@@ -23,10 +22,11 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.eclipse.jgit.transport.CredentialsProvider
+import java.io.File
 
 class GitViewModel(val app: Application) : AndroidViewModel(app) {
-    private val repoDir: java.io.File
-        get() = java.io.File(app.filesDir, projectName.flow.value)
+    private val repoDir: File
+        get() = File(app.filesDir, projectName.flow.value)
     private val credentials = SecureCredentialManager(app)
     private val db by lazy { app.db.fileDao() }
 
@@ -54,11 +54,11 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     @OptIn(ExperimentalCoroutinesApi::class)
     val commits = projectName
         .flow.flatMapLatest { project ->
-            getCommitsPager(java.io.File(app.filesDir, project))
+            getCommitsPager(File(app.filesDir, project))
         }
         .cachedIn(viewModelScope)
 
-    private fun getCommitsPager(repoDir: java.io.File) = Pager(
+    private fun getCommitsPager(repoDir: File) = Pager(
         config = PagingConfig(
             pageSize = 20, // Adjust page size as needed
             enablePlaceholders = false
@@ -67,7 +67,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     ).flow
 
     private suspend fun resetGit(showSuccess: Boolean = false) {
-        if(showSuccess){
+        if (showSuccess) {
             setGitStatus(GitStatus.SUCCESS)
             delay(1000)
         }
@@ -144,8 +144,15 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
             val creds = fetchCredentials() ?: return@launch
 
             try {
-                deleteAllFilesInFolder(repoDir)
+                val backupDir = File(app.filesDir, "backup")
+                backupFiles(repoDir, backupDir)
+
+                repoDir.deleteRecursively()
                 GitHelper.clone(repoDir, creds, repoUrl)
+                restoreBackup(backupDir, repoDir)
+                backupDir.deleteRecursively()
+                backupDir.delete()
+
                 syncDbToLocal(false) // override repo with project files
                 syncLocalToDb() // load all the files into the db
 
@@ -155,6 +162,25 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
             } catch (e: Exception) {
                 reportError(e, "Clone")
             }
+        }
+    }
+
+    private fun backupFiles(repoDir: File, backupDir: File) {
+        if (!repoDir.exists()) return
+
+        backupDir.mkdirs()
+        backupDir.deleteRecursively()
+
+        repoDir.listFiles()?.forEach { file ->
+            val target = File(backupDir, file.name)
+            file.copyRecursively(target, overwrite = true)
+        }
+    }
+
+    private fun restoreBackup(backupDir: File, repoDir: File) {
+        backupDir.listFiles()?.forEach { file ->
+            val target = File(repoDir, file.name)
+            file.copyRecursively(target, overwrite = true)
         }
     }
 
@@ -246,7 +272,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     fun deleteProject(projectName: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
-                java.io.File(app.filesDir, projectName).deleteRecursively()
+                File(app.filesDir, projectName).deleteRecursively()
             }
         }
     }

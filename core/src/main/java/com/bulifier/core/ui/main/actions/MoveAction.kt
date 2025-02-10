@@ -67,7 +67,8 @@ suspend fun deleteAction(file: File, db: FileDao, logger: Logger) {
             logger.d("File deleted: ${it.path}/${it.fileName}")
         }
     } else {
-        db.deleteFolder(file.fileId, file.path + "/" + file.fileName, file.projectId)
+        val fullPath = if (file.path.isEmpty()) file.fileName else "${file.path}/${file.fileName}"
+        db.deleteFolder(file.fileId, fullPath, file.projectId)
         logger.d("Folder deleted: ${file.fileName}")
     }
 }

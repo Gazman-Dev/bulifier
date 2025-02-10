@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen>
+    <paths>
+        <cache-path
+            name="pdf_cache"
+            path="pdf/" />
+        <cache-path
+            name="project_cache"
+            path="project/" />
+    </paths>
+</PreferenceScreen>

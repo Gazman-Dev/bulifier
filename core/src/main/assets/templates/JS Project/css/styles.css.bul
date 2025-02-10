@@ -1,0 +1,11 @@
+- Purpose: Styling for game elements and global layout
+- Imports: None
+
+- Font Definitions:
+  - SpecialFont from ../assets/fonts/SuperShiny.ttf
+
+- CSS Rules:
+  - Body: Black background, white text, SpecialFont
+  - game-container: Full viewport dimensions
+  - splash-text: Large centered text
+  - splash-icon: Centered image with 150px width
