@@ -13,6 +13,7 @@ object Prefs {
 
     fun updateProject(project: Project) {
         projectId.set(project.projectId)
+        template.set(project.template ?: "")
         projectName.set(project.projectName)
         projectDetails.set(project.projectDetails ?: "")
         path.set("")
@@ -20,6 +21,7 @@ object Prefs {
 
     val projectId by lazy { PrefLongValue("projectId") }
     val projectName by lazy { PrefStringValue("project_v10") }
+    val template by lazy { PrefStringValue("") }
     val projectDetails by lazy { PrefStringValue("project_details") }
     val path by lazy { PrefStringValue("path_v1") }
     val models by lazy { PrefListValue("models") }

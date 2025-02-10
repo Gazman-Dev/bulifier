@@ -11,15 +11,18 @@ import com.bulifier.core.db.SchemaSettings
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
 import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.utils.readUntil
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.StringReader
 
 object SchemaModel {
     const val KEY_PACKAGE = "package"
+    const val KEY_BULLETS_FILE_NAME = "bullets_file_name"
     const val KEY_CONTEXT = "context"
     const val KEY_PROMPT = "prompt"
     const val KEY_MAIN_FILE = "main_file"
@@ -42,14 +45,14 @@ object SchemaModel {
         KEY_FOLDER_NAME,
         KEY_FILES,
         KEY_PROJECT_NAME,
-        KEY_BULLET_RAW_FILE_PAIR
+        KEY_BULLET_RAW_FILE_PAIR,
+        KEY_BULLETS_FILE_NAME
     )
 
     private val job = Job()
     private val scope = CoroutineScope(Dispatchers.Default + job)
     private lateinit var db: AppDatabase
     private lateinit var appContext: Context
-    private var gitRoots: GitRoots? = null
 
     fun init(appContext: Context) {
         db = appContext.db
@@ -75,33 +78,10 @@ object SchemaModel {
         withContext(Dispatchers.IO) {
             if (!db.fileDao().isPathExists("schemas", projectId)) {
                 createDefaultSchemas(projectId)
+            } else {
+                reloadSchemas(projectId)
             }
-            gitRoots = GitRoots(db, projectId).apply {
-                load()
-            }
         }
-    }
-
-    fun addRoot(root: String) {
-        scope.launch {
-            gitRoots?.addRoot(root)
-        }
-    }
-
-    suspend fun getRoots(projectId: Long) =
-        db.fileDao().getContent("", GIT_ROOTS_FILE_NAME, projectId)?.content?.lines()?.filter {
-            it.isNotBlank()
-        }
-
-    private suspend fun createGitRoots(projectId: Long) {
-        db.fileDao().insertFile(
-            File(
-                path = "",
-                fileName = "git_roots.settings",
-                isFile = true,
-                projectId = projectId
-            )
-        )
     }
 
     private suspend fun createDefaultSchemas(projectId: Long) {
@@ -123,8 +103,16 @@ object SchemaModel {
 
     suspend fun resetSystemSchemas(projectId: Long) {
         withContext(Dispatchers.IO) {
-            appContext.assets.list("schemas")?.map { fileName ->
-                appContext.assets.open("schemas/$fileName").bufferedReader().use {
+            val project = db.fileDao().getProjectById(projectId)
+            var schemasPath = "schemas/"
+            if (project.template != null) {
+                val assetsPath = "templates/${project.template}/schemas/"
+                if (appContext.assets.list(assetsPath) != null) {
+                    schemasPath = assetsPath
+                }
+            }
+            appContext.assets.list(schemasPath)?.map { fileName ->
+                appContext.assets.open("$schemasPath$fileName").bufferedReader().use {
                     val schemaData = it.readText()
                     val fileId = db.fileDao().insertFile(
                         File(
@@ -157,42 +145,50 @@ object SchemaModel {
         }
     }
 
-    suspend fun reloadSchemas(projectId: Long) {
-        withContext(Dispatchers.IO) {
-            db.fileDao().loadFilesByPath("schemas", projectId).map {
+    suspend fun reloadSchemas(projectId: Long): Boolean {
+        return withContext(Dispatchers.IO) {
+            var schemas = db.fileDao().loadFilesByPath("schemas", projectId).map {
                 parseSchema(
                     it.content, it.fileName.substringBeforeLast("."), projectId
                 )
-            }.run {
-                val schemas = flatten()
-                val settings = schemas.filter { it.type == SchemaType.SETTINGS }.map {
-                    val map = it.content.split("\n").filter {
-                        it.trim().isNotEmpty()
-                    }.associate { line ->
-                        try {
-                            val values = line.substring(" - ".length - 1).lowercase().split(":")
-                            values[0].trim() to values[1].trim()
-                        } catch (e: Exception) {
-                            throw Error("Error parsing settings schema: $line", e)
-                        }
+            }.flatten()
+            reloadSchemas(schemas, projectId)
+            true
+        }
+    }
+
+    private suspend fun reloadSchemas(
+        schemas: List<Schema>,
+        projectId: Long
+    ) {
+        schemas.run {
+            val settings = filter { it.type == SchemaType.SETTINGS }.map {
+                val map = it.content.split("\n").filter {
+                    it.trim().isNotEmpty()
+                }.associate { line ->
+                    try {
+                        val values = line.substring(" - ".length - 1).lowercase().split(":")
+                        values[0].trim() to values[1].trim()
+                    } catch (e: Exception) {
+                        throw Error("Error parsing settings schema: $line", e)
                     }
-                    SchemaSettings(
-                        schemaName = it.schemaName,
-                        inputExtension = map["input extension"] ?: "bul",
-                        processingMode = map["processing mode"]?.let {
-                            ProcessingMode.fromString(it)
-                        } ?: ProcessingMode.SINGLE,
-                        multiFilesOutput = map["multi files output"] == "true",
-                        overrideFiles = map["override files"] == "true",
-                        visibleForAgent = map["visible for agent"] == "true",
-                        isAgent = map["agent"] == "true",
-                        purpose = map["purpose"] ?: "TBA",
-                        projectId = projectId
-                    )
                 }
-                db.schemaDao()
-                    .addSchemas(schemas.filter { it.type != SchemaType.SETTINGS }, settings)
+                SchemaSettings(
+                    schemaName = it.schemaName,
+                    inputExtension = map["input extension"] ?: "bul",
+                    processingMode = map["processing mode"]?.let {
+                        ProcessingMode.fromString(it)
+                    } ?: ProcessingMode.SINGLE,
+                    multiFilesOutput = map["multi files output"] == "true",
+                    overrideFiles = map["override files"] == "true",
+                    visibleForAgent = map["visible for agent"] == "true",
+                    isAgent = map["agent"] == "true",
+                    purpose = map["purpose"] ?: "TBA",
+                    projectId = projectId
+                )
             }
+            db.schemaDao()
+                .addSchemas(schemas.filter { it.type != SchemaType.SETTINGS }, settings)
         }
     }
 
@@ -247,18 +243,28 @@ object SchemaModel {
         }.filterNotNull()
     }
 
+    /**
+     * Extracts keys from the input template.
+     *
+     * It scans until it finds an opening marker (⟪), then reads until the matching closing marker (⟫).
+     * If the captured token is a single line (i.e. it doesn't contain a newline), it's added as a key.
+     * Conditional blocks (which span multiple lines) are ignored.
+     */
     @VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
     fun extractKeys(input: String): Set<String> {
-        // Regex pattern to find {key} - it looks for anything enclosed in {}
-        val pattern = """⟪(\w+)⟫""".toRegex()
-        // Finds all matches, maps them to keep only the content without braces, and collects them into a set to avoid duplicates
-        val results = pattern.findAll(input)
-        return results.map {
-            if (it.groupValues.size > 1) {
-                it.groupValues[1]
-            } else {
-                null
+        val keys = mutableSetOf<String>()
+        val reader = StringReader(input)
+        while (true) {
+            val ch = reader.read()
+            if (ch == -1) break
+            if (ch.toChar() == '⟪') {
+                val token = reader.readUntil('⟫')
+                if (!token.contains('\n')) {
+                    keys.add(token)
+                }
             }
-        }.filterNotNull().toSet()
+        }
+        return keys
     }
 }
+

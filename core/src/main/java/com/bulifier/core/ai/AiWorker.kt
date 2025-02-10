@@ -1,6 +1,8 @@
 package com.bulifier.core.ai
 
 import android.content.Context
+import android.util.Log
+import androidx.annotation.VisibleForTesting
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.bulifier.core.db.Content
@@ -19,6 +21,7 @@ import com.bulifier.core.db.db
 import com.bulifier.core.models.ApiModel
 import com.bulifier.core.models.QuestionsModel
 import com.bulifier.core.schemas.SchemaModel
+import com.bulifier.core.schemas.SchemaModel.KEY_BULLETS_FILE_NAME
 import com.bulifier.core.schemas.SchemaModel.KEY_BULLET_RAW_FILE_PAIR
 import com.bulifier.core.schemas.SchemaModel.KEY_CONTEXT
 import com.bulifier.core.schemas.SchemaModel.KEY_FILES
@@ -30,17 +33,18 @@ import com.bulifier.core.schemas.SchemaModel.KEY_PROJECT_DETAILS
 import com.bulifier.core.schemas.SchemaModel.KEY_PROJECT_NAME
 import com.bulifier.core.schemas.SchemaModel.KEY_PROMPT
 import com.bulifier.core.schemas.SchemaModel.KEY_SCHEMAS
-import com.bulifier.core.ui.main.actions.deleteAction
 import com.bulifier.core.ui.main.actions.markForDeleteAction
 import com.bulifier.core.ui.main.actions.moveAction
 import com.bulifier.core.utils.Logger
+import com.bulifier.core.utils.hasMore
+import com.bulifier.core.utils.readUntil
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.StringReader
 import java.util.concurrent.atomic.AtomicInteger
-import kotlin.text.replace
 
 class AiWorker(
     context: Context,
@@ -451,8 +455,7 @@ class AiWorker(
                         db.fileDao().insertContentAndUpdateFileMetaData(
                             Content(
                                 fileId = file.fileId,
-                                content = normalizeContent(responseData.response),
-                                type = Content.Type.RAW
+                                content = normalizeContent(responseData.response)
                             ),
                             syncFileId
                         )
@@ -609,8 +612,7 @@ class AiWorker(
         db.fileDao().insertContentAndUpdateFileMetaData(
             Content(
                 fileId = fileId,
-                content = removeFirstLine(responseData.response).trim() + "\n",
-                type = Content.Type.RAW
+                content = normalizeContent(responseData.response)
             ),
             file.syncHash
         )
@@ -674,8 +676,7 @@ class AiWorker(
             db.fileDao().insertContentAndUpdateFileMetaData(
                 Content(
                     fileId = fileId,
-                    content = (item.imports.joinToString("\n") { "import $it" } + "\n\n" + content).trim(),
-                    type = Content.Type.BULLET
+                    content = (item.imports.joinToString("\n") { "import $it" } + "\n\n" + content).trim()
                 )
             )
             logger.d("Multi-file content saved for fileId=$fileId, fileName=$fileName")
@@ -700,17 +701,19 @@ class AiWorker(
     }
 
     private fun normalizeContent(input: String): String {
-        // Trim the input first
-        var normalized = input.trim()
+        // Regex to capture a single code block with optional language spec,
+        // using DOT_MATCHES_ALL so `.` matches newline.
+        val codeBlockPattern = Regex("(?s)```(?:\\w+)?\\s*(.*?)\\s*```")
+        val matchResult = codeBlockPattern.find(input)
 
-        // Remove code block markers with or without a language specification
-        val codeBlockRegex = Regex("```(\\w+)?\\s*([\\s\\S]*?)\\s*```")
-        normalized = codeBlockRegex.replace(normalized) { matchResult ->
-            // The match result contains only the content within the code block
-            matchResult.groups[2]?.value?.trim() ?: ""
+        val codeInsideFence = matchResult?.groups?.get(1)?.value?.trim()
+
+        // If we found no match or the fenced content is blank, return original
+        return if (codeInsideFence.isNullOrBlank()) {
+            input.trim() + "\n"
+        } else {
+            codeInsideFence + "\n"
         }
-
-        return normalized
     }
 
 
@@ -784,24 +787,23 @@ class AiWorker(
         syncFile: SyncFile? = null
     ): String? {
         logger.d("Updating schema content for promptId=${historyItem.promptId}")
-        var content = schemaText
         val filesData = keys.runIfContains(KEY_FILES) {
             db.fileDao().loadBulletFiles(historyItem.projectId)
                 .groupBy { it.path }
                 .map { (path, files) ->
                     if (files.size == 1) {
                         val fileName = files[0].fileName
-                        val path = if(files[0].path.trim().isEmpty()){
+                        val path = if (files[0].path.trim().isEmpty()) {
                             ""
-                        }else{
+                        } else {
                             "${files[0].path}/"
                         }
                         " - $path$fileName${extractPurpose(files[0].content)}"
                     } else {
-                        files.joinToString("\n"){
-                            val path = if(path.trim().isEmpty()){
+                        files.joinToString("\n") {
+                            val path = if (path.trim().isEmpty()) {
                                 ""
-                            }else{
+                            } else {
                                 "${it.path}/"
                             }
                             " - $path${it.fileName}${extractPurpose(it.content)}"
@@ -816,6 +818,16 @@ class AiWorker(
                 }
         }
 
+        var bulletsFileName = syncFile?.let {
+            db.fileDao().getFile(it.bulletsFileId).run {
+                if (path.trim().isEmpty()) {
+                    fileName
+                } else {
+                    "$path/$fileName"
+                }
+            }
+        }
+
         val bulletRawFilePair = keys.runIfContains(KEY_BULLET_RAW_FILE_PAIR) {
             if (syncFile == null) {
                 throw RuntimeException("Bullet raw file pair requires file name")
@@ -827,7 +839,6 @@ class AiWorker(
             val rawContent = syncFile.rawFileId?.let {
                 db.fileDao().getContent(it)?.content
             }
-
 
             if (rawContent == null) {
                 """
@@ -846,14 +857,15 @@ class AiWorker(
         }
 
         val folderName = historyItem.path.substringAfterLast(".")
-        mapOf(
+        val keysMap = mapOf(
             KEY_PACKAGE to historyItem.path,
+            KEY_BULLETS_FILE_NAME to bulletsFileName,
             KEY_PROMPT to historyItem.prompt,
             KEY_MAIN_FILE to fileData?.content,
             KEY_MAIN_FILE_NAME to fileData?.let {
-                if(it.path.isEmpty()){
+                if (it.path.isEmpty()) {
                     it.fileName
-                }else {
+                } else {
                     it.path + "/" + it.fileName
                 }
             },
@@ -864,23 +876,18 @@ class AiWorker(
             KEY_SCHEMAS to schemas,
             KEY_PROJECT_NAME to project.projectName,
             KEY_BULLET_RAW_FILE_PAIR to bulletRawFilePair
-        ).forEach { key, value ->
-            if (keys.contains(key)
-            ) {
-                content = content.replace("⟪$key⟫", value ?: "")
-            }
-        }
-
-        return content
+        )
+        val result = injectSchema(schemaText, keysMap)
+        return result
     }
 
     private fun extractPurpose(content: String): String {
         val prefix = "- Purpose:"
         val purpose = content.lines().firstOrNull { it.trim().startsWith(prefix) }?.trim()
             ?.substringAfter(prefix)?.trim()
-        return if(purpose == null){
+        return if (purpose == null) {
             ""
-        } else{
+        } else {
             ": $purpose"
         }
     }
@@ -900,4 +907,80 @@ class AiWorker(
         val historyItem: HistoryItem,
         val response: String
     )
+}
+
+/**
+ * Scans through the schema text and injects values from [keysMap].
+ *
+ * It works as follows:
+ *   - Reads until the next opening marker "⟪" and appends that text to the output.
+ *   - Consumes the "⟪" marker.
+ *   - Marks the reader and reads a candidate block until "⟫".
+ *     - If the block contains a newline, resets and reads the block until "\n⟫"
+ *       (i.e. a conditional block) and passes it to processBlock.
+ *     - Otherwise, treats it as a simple placeholder.
+ */
+@VisibleForTesting(otherwise = VisibleForTesting.PRIVATE)
+fun injectSchema(schemaText: String, keysMap: Map<String, String?>): String {
+    val reader = StringReader(schemaText)
+    val output = StringBuilder()
+
+    while (true) {
+        // Read and append text up to the next "⟪"
+        output.append(reader.readUntil("⟪"))
+        if (!reader.hasMore()){
+            break
+        }
+
+        var nextPart = reader.readUntil("⟫")
+        if (nextPart.contains("\n")) {
+            val blockBuilder = StringBuilder(nextPart)
+            while (!nextPart.endsWith("\n")) {
+                blockBuilder.append("⟫")
+                if(!reader.hasMore()){
+                    throw RuntimeException("Error injecting schema")
+                }
+                nextPart = reader.readUntil("⟫")
+                blockBuilder.append(nextPart)
+            }
+            output.append(processBlock(blockBuilder.toString(), keysMap))
+        } else {
+            output.append(keysMap[nextPart] ?: "")
+        }
+    }
+    return output.toString().trim().replace("\r", "")
+}
+
+private fun processBlock(block: String, keysMap: Map<String, String?>): String {
+    val reader = StringReader(block)
+    val output = StringBuilder()
+
+    val condition = reader.readUntil("\n").trim()
+    if(!checkCondition(condition, keysMap)){
+        return ""
+    }
+
+    while (true) {
+        output.append(reader.readUntil("⟪"))
+        if (!reader.hasMore()){
+            break
+        }
+        val nextPart = reader.readUntil("⟫")
+        output.append(keysMap[nextPart] ?: "")
+    }
+
+    return output.toString()
+}
+
+private fun checkCondition(
+    condition: String,
+    map: Map<String, String?>
+) = condition.split("""[\t ]+and[\t ]+""".toRegex()).map {
+    val (key, value) = it.split("""[\t ]*=[\t ]*""".toRegex())
+    if(map[key] != value){
+        Log.d("AiWorker", "Condition failed: $condition -> $key != $value")
+    }
+    map[key] == value
+}.reduce { a,b->
+    a && b
 }

@@ -26,7 +26,6 @@ private fun fileContent(content: String, fileName: String) =
         ),
         Content(
             content = content,
-            fileId = -1,
-            type = Content.Type.SCHEMA
+            fileId = -1
         )
     )

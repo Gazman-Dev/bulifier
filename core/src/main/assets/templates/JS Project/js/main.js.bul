@@ -1,0 +1,15 @@
+- Purpose: Phaser game initialization
+- Imports:
+  - splash.js (SplashScene)
+  - game.js (GameScene)
+
+- Configuration:
+  - Phaser config object with:
+    - Parent container id: game-container
+    - Dynamic width/height from window
+    - Arcade physics (non-debug)
+    - Scale mode: FIT and CENTER_BOTH
+    - Scene order: [SplashScene, GameScene]
+
+- Initialization:
+  - window.onload creates Phaser.Game instance

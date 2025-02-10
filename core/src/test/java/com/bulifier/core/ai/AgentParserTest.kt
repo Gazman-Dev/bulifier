@@ -76,6 +76,7 @@ class AgentParserTest {
 
     @Test
     fun `test all valid combinations of commands, actions, and context`() {
+        val currentPath = ""
         val commandCases = listOf(
             emptyList<AgentCommand>(), // 0 commands
             listOf(AgentCommand(

@@ -1,0 +1,16 @@
+- Purpose: Display splash screen and transition to game
+- Imports:
+  - Phaser library (implicit)
+  - game.js (for GameScene reference)
+
+- Class: SplashScene extends Phaser.Scene
+- Functions:
+  - constructor():
+    - sets SplashScene scene
+  - preload():
+    - Loads 'bulifierIcon' from assets/images/bulifier-logo.png
+  - create():
+    - Creates centered text at 1/6 screen height
+    - Calculates image dimensions preserving aspect ratio
+    - Positions image 100px below text
+    - Auto-transitions to GameScene after 3 seconds

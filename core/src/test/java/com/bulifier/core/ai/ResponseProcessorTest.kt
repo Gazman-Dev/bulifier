@@ -8,7 +8,7 @@ class ResponseProcessorTest {
     @Test
     fun parseResponse() {
         val basePath = "com/games/snake"
-        val files = ResponseProcessor().parseResponse(EXAMPLE1, basePath)
+        val files = ResponseProcessor().parseResponse(EXAMPLE1)
         verifyFile(files, basePath, "config.py", 0)
         verifyFile(files, basePath, "snake.py", 1)
         verifyFile(files, basePath, "food.py", 1)

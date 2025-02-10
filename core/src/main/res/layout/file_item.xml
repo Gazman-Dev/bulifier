@@ -12,7 +12,6 @@
         android:layout_width="50dp"
         android:layout_height="50dp"
         tools:src="@drawable/baseline_folder_24"
-        app:tint="@color/folder_color"
         android:contentDescription="@null"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent" />

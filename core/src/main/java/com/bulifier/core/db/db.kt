@@ -3,11 +3,14 @@
 package com.bulifier.core.db
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.Keep
 import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Room
+import androidx.room.RoomDatabase
 import com.bulifier.core.db.Content.Type
+import java.util.concurrent.Executors
 import java.util.zip.Adler32
 
 val Context.db: AppDatabase
@@ -20,7 +23,11 @@ private fun getDatabase(context: Context): AppDatabase {
             context.applicationContext,
             AppDatabase::class.java,
             "app_database"
-        )
+        ).setQueryCallback(object : RoomDatabase.QueryCallback {
+            override fun onQuery(sqlQuery: String, bindArgs: List<Any?>) {
+                Log.d("room", "SQL Query: \n$sqlQuery\nBind Args: $bindArgs")
+            }
+        }, Executors.newSingleThreadExecutor())
             .addTypeConverter(DateTypeConverter())
             .addTypeConverter(SetConverter())
             .addTypeConverter(LongListConverter())
@@ -66,12 +73,12 @@ data class FileData(
     @ColumnInfo(name = "content")
     val content: String = "",
 
+    @Deprecated("not used anymore")
     @ColumnInfo(name = "type")
-    val type: Type
+    val type: Type = Type.NONE,
 ) {
     fun toContent() = Content(
         fileId = fileId,
-        content = content,
-        type = type
+        content = content
     )
 }

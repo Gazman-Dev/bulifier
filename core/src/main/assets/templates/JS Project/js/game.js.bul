@@ -1,0 +1,52 @@
+- Purpose: Core game logic for Flappy Bird-like game
+- Imports:
+  - Phaser library (implicit)
+
+- Class: GameScene extends Phaser.Scene
+- Params/Variables:
+  - bird: Physics sprite with gravity
+  - pipes: Physics group
+  - score: Number tracking points
+  - pipeTimer: Event for pipe spawning
+
+- Functions:
+  - constructor():
+    - sends GameScene to super
+
+  - create():
+    - Generates birdTexture (gold circle) if missing
+    - Generates pipeTexture (green rectangle) if missing
+    - Sets up input handlers (pointerdown/spacebar) to call flap()
+    - Sets score counter to 0
+    - Initialize scoreText
+      - position top
+      - fontSize 32
+      - color black
+      - depth 10
+    - Configures collision between bird and pipe to call gameOver()
+
+  - flap():
+    - Applies -300 vertical velocity to bird
+
+  - spawnPipes():
+    - Creates pipe pair with 150px gap
+    - Positions pipes at random vertical location
+    - Sets horizontal movement (-200px/s)
+    - Marks pipes as unscored
+
+  - update():
+    - Checks for bird out of bounds
+    - Updates score(+0.5 each pipe) when pipes pass bird
+    - Rounds score to integers for display
+
+  - gameOver():
+    - Stops physics and pipe spawning
+    - Applies red tint to bird
+    - Restarts scene after 1 second delay
+
+- Constants:
+  - Pipe gapSize: 150
+  - Bird gravity: 800
+  - Pipe spawn interval: 1500ms
+  - Pipe velocity: -200px/s
+  - Flap force: -300 velocity

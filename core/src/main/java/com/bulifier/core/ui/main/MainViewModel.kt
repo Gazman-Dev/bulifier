@@ -1,6 +1,10 @@
 package com.bulifier.core.ui.main
 
 import android.app.Application
+import android.content.Intent
+import android.net.Uri
+import android.provider.OpenableColumns
+import android.webkit.MimeTypeMap
 import android.widget.Toast
 import androidx.core.os.bundleOf
 import androidx.lifecycle.AndroidViewModel
@@ -13,6 +17,7 @@ import com.bulifier.core.db.File
 import com.bulifier.core.db.FileData
 import com.bulifier.core.db.Project
 import com.bulifier.core.db.db
+import com.bulifier.core.db.getBinaryFile
 import com.bulifier.core.prefs.PrefBooleanValue
 import com.bulifier.core.prefs.Prefs
 import com.bulifier.core.prefs.Prefs.path
@@ -29,6 +34,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.util.Date
+import java.io.File as JavaFile
 
 data class FullPath(
     val fileName: String?,
@@ -100,7 +106,11 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
 
         viewModelScope.launch {
-            combine(path.flow, _openedFile, projectName.flow) { pathValue, fileInfo, projectNameValue ->
+            combine(
+                path.flow,
+                _openedFile,
+                projectName.flow
+            ) { pathValue, fileInfo, projectNameValue ->
                 val fullPath = if (pathValue.isNotBlank()) {
                     "/$pathValue"
                 } else {
@@ -114,20 +124,26 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    suspend fun openFileByPath(path: String): Boolean {
+        val fileName = path.substringAfterLast("/")
+        val path = path.substringBeforeLast("/", "")
+        db.getFile(path, fileName, projectId.flow.value)?.let {
+            _openedFile.value = FileInfo(
+                fileId = it.fileId,
+                fileName = it.fileName
+            )
+            return true
+        }
+        return false
+    }
+
     fun openFile(file: File) {
         logger.i("openFile", bundleOf("fileName" to file.fileName, "fileId" to file.fileId))
         viewModelScope.launch {
-            val content = db.getContent(file.fileId) ?: FileData(
-                fileId = file.fileId,
-                fileName = file.fileName,
-                path = file.path,
-                isFile = true,
-                content = "",
-                type = Content.Type.NONE
-            )
+            val file = db.getFile(file.fileId)
             _openedFile.value = FileInfo(
-                fileId = content.fileId,
-                fileName = content.fileName
+                fileId = file.fileId,
+                fileName = file.fileName
             )
         }
     }
@@ -146,20 +162,32 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         _openedFile.value = null
     }
 
-    suspend fun createUpdateOrSelectProject(projectName: String, projectDetails: String? = null) {
+    suspend fun createUpdateOrSelectProject(
+        projectName: String,
+        projectDetails: String? = null,
+        template: String? = null
+    ) {
         logger.i("createOrSelectProject", bundleOf("projectName" to projectName))
         val existingProject = db.getProject(projectName)
         if (existingProject != null) {
             logger.d("Project already exists: $projectName")
-            if (existingProject.projectDetails != projectDetails) {
-                db.updateProject(existingProject.copy(projectDetails = projectDetails))
+            if (existingProject.projectDetails != projectDetails || existingProject.template != template) {
+                val newProject =
+                    existingProject.copy(projectDetails = projectDetails, template = template)
+                db.updateProject(newProject)
+                selectProject(newProject)
                 logger.d("Project details updated: $projectName")
+            } else {
+                selectProject(existingProject)
             }
-            selectProject(existingProject)
             return
         }
-        val project = Project(projectName = projectName, projectDetails = projectDetails)
-        val projectId = db.insertProject(project)
+        val project = Project(
+            projectName = projectName,
+            projectDetails = projectDetails,
+            template = template
+        )
+        val projectId = db.createProject(app, project, logger)
         logger.d("New project created with ID: $projectId")
         withContext(Dispatchers.Main) {
             Prefs.updateProject(project.copy(projectId = projectId))
@@ -176,46 +204,6 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     fun updatePath(path: String) {
         logger.i("updatePath", bundleOf("path" to path))
         Prefs.path.set(path)
-    }
-
-    fun updateCreateFile(fileName: String) {
-        logger.i("updateCreateFile", bundleOf("fileName" to fileName))
-        viewModelScope.launch {
-            val projectId = projectId.flow.value
-            val path = path.flow.value
-            db.insertFile(
-                File(
-                    fileName = fileName,
-                    projectId = projectId,
-                    isFile = true,
-                    path = path
-                )
-            )
-            logger.d("File created: $fileName at path: $path")
-        }
-    }
-
-    fun createFolder(folderName: String) {
-        logger.i("createFolder", bundleOf("folderName" to folderName))
-        viewModelScope.launch {
-            val projectId = projectId.flow.value
-            val path = path.flow.value
-            val extraPathParts = mutableListOf<String>()
-            val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
-            folderName.split("[^a-zA-Z0-9]".toRegex()).forEach {
-                db.insertFile(
-                    File(
-                        fileName = it,
-                        projectId = projectId,
-                        isFile = false,
-                        path = (pathParts + extraPathParts).joinToString("/")
-                    )
-                )
-                logger.d("Folder created: $it in path: ${(pathParts + extraPathParts).joinToString("/")}")
-                extraPathParts += it
-            }
-            updatePath((pathParts + extraPathParts).joinToString("/"))
-        }
     }
 
     fun updateFileContent(content: String) {
@@ -255,6 +243,29 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
     }
 
+    fun createFolder(folderName: String) {
+        logger.i("createFolder", bundleOf("folderName" to folderName))
+        viewModelScope.launch {
+            val projectId = projectId.flow.value
+            val path = path.flow.value
+            val extraPathParts = mutableListOf<String>()
+            val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
+            folderName.split("[^a-zA-Z0-9]".toRegex()).forEach {
+                db.insertFile(
+                    File(
+                        fileName = it,
+                        projectId = projectId,
+                        isFile = false,
+                        path = (pathParts + extraPathParts).joinToString("/")
+                    )
+                )
+                logger.d("Folder created: $it in path: ${(pathParts + extraPathParts).joinToString("/")}")
+                extraPathParts += it
+            }
+            updatePath((pathParts + extraPathParts).joinToString("/"))
+        }
+    }
+
     fun reloadSchemas() {
         logger.i("reloadSchemas")
         viewModelScope.launch {
@@ -290,9 +301,101 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         return wasUpdated
     }
 
-    suspend fun isProjectExists(projectName: String): Boolean {
-        val exists = db.isProjectExists(projectName)
-        logger.d("Project exists: $exists")
-        return exists
+    suspend fun projectNames() = db.projectNames()
+
+    suspend fun getProject(projectName: String) = db.getProject(projectName)
+
+    fun getFileExtension(uri: Uri): String {
+        // First attempt: Query the display name from the ContentResolver.
+        var extension: String? = null
+        if (uri.scheme == "content") {
+            app.contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                val nameIndex = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+                if (cursor.moveToFirst() && nameIndex != -1) {
+                    val fileName = cursor.getString(nameIndex)
+                    // Extract extension (if any) from the file name.
+                    extension = fileName.substringAfterLast('.', "")
+                }
+            }
+        }
+
+        // Second attempt: Use the MIME type to get an extension.
+        if (extension.isNullOrBlank()) {
+            val mimeType = app.contentResolver.getType(uri)
+            extension = MimeTypeMap.getSingleton().getExtensionFromMimeType(mimeType)
+        }
+
+        // Fallback if no extension found.
+        if (extension.isNullOrBlank()) {
+            extension = "dat"
+        }
+        return extension
+    }
+
+    /**
+     * Ensures correct mapping for common file types.
+     */
+    private fun normalizeFileExtension(extension: String?): String? {
+        return when (extension?.lowercase()) {
+            "jpeg" -> "jpg"
+            "tif" -> "tiff"
+            "svgz" -> "svg"
+            "htm" -> "html"
+            "xht" -> "xhtml"
+            "ogv" -> "ogg" // Some systems use .ogv for video/ogg
+            "woff2", "woff", "ttf", "otf" -> extension // Keep as is
+            "png", "jpg", "gif", "webp", "svg",
+            "mp4", "webm", "ogg", "ico" -> extension // Keep as is
+            else -> extension // Return as is or null
+        }
+    }
+
+    fun saveFile(data: Intent?) {
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                val uri: Uri? = data?.data
+                val path = path.flow.value
+
+                if (uri == null) {
+                    logger.d("No URI found in Intent")
+                } else {
+                    val extension = getFileExtension(uri)
+                    val normalizedExtension = normalizeFileExtension(extension)
+                    val fileName = "${System.currentTimeMillis()}.$normalizedExtension"
+
+                    db.transaction {
+                        val id = db.insertFile(
+                            File(
+                                fileName = fileName,
+                                projectId = projectId.flow.value,
+                                isFile = true,
+                                path = path,
+                                isBinary = true
+                            )
+                        )
+
+                        val destination = getBinaryFile(app, id)
+                        destination.parentFile?.mkdirs()
+                        val size = saveFile(destination, uri)
+                        if (size != -1L) {
+                            db.updateFileMetaData(id, size, -1, -1)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun saveFile(destination: JavaFile, uri: Uri): Long {
+        app.contentResolver.openInputStream(uri)?.use { inputStream ->
+            destination.outputStream().use { outputStream ->
+                return inputStream.copyTo(outputStream)
+            }
+        } ?: run {
+            logger.d("Failed to open InputStream from URI: $uri")
+            logger.e("Failed to open InputStream from URI")
+        }
+
+        return -1
     }
 }

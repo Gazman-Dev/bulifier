@@ -2,6 +2,8 @@ package com.bulifier.core.security
 
 import android.view.MenuItem
 import android.view.View
+import android.widget.Button
+import androidx.core.view.isVisible
 
 /**
  * This interface serves as a placeholder for the verification logic related to UI actions within Bulifier.
@@ -22,4 +24,10 @@ import android.view.View
 interface UiVerifier {
     fun verifySendAction(anchor: View) = true
     fun verifyMenuAction(menuItem: MenuItem, view: View) = Unit
+    fun verifyRunButton(view: View, isFileOpen: Boolean) {
+        view.isVisible = false
+    }
+    fun verifyReleaseButton(view: View, isFileOpen: Boolean) {
+        view.isVisible = false
+    }
 }
