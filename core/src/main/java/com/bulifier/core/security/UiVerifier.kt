@@ -2,7 +2,6 @@ package com.bulifier.core.security
 
 import android.view.MenuItem
 import android.view.View
-import android.widget.Button
 import androidx.core.view.isVisible
 
 /**
@@ -27,6 +26,7 @@ interface UiVerifier {
     fun verifyRunButton(view: View, isFileOpen: Boolean) {
         view.isVisible = false
     }
+
     fun verifyReleaseButton(view: View, isFileOpen: Boolean) {
         view.isVisible = false
     }

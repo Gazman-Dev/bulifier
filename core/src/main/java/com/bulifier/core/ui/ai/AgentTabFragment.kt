@@ -4,18 +4,19 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
+import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.databinding.FragmentAgentTabBinding
 import com.bulifier.core.git.GitViewModel
-import com.bulifier.core.prefs.PrefBooleanValue
 import com.bulifier.core.prefs.PrefStringValue
 import com.bulifier.core.security.ProductionSecurityFactory
 import com.bulifier.core.security.UiVerifier
 import com.bulifier.core.ui.main.MainViewModel
+import com.bulifier.core.utils.showToast
 import dagger.hilt.android.EntryPointAccessors
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
 
 class AgentTabFragment : Fragment() {
 
@@ -23,7 +24,6 @@ class AgentTabFragment : Fragment() {
     private val binding get() = _binding!!
 
     private val agentText = PrefStringValue("agent_text")
-    private val notAutoCommit by lazy { PrefBooleanValue("not_agent_auto_commit") }
 
     // ViewModels used in your original logic.
     private val viewModel by activityViewModels<HistoryViewModel>()
@@ -50,11 +50,13 @@ class AgentTabFragment : Fragment() {
         // Prepopulate the text input with the saved agent text.
         binding.aiMessageInput.setText(agentText.flow.value)
 
-        // Configure the auto-commit switch.
-        binding.autoCommit.isVisible = !gitViewModel.isCloneNeeded()
-        binding.autoCommit.isChecked = !notAutoCommit.flow.value
-        binding.autoCommit.setOnCheckedChangeListener { _, isChecked ->
-            notAutoCommit.set(!isChecked)
+        lifecycleScope.launch {
+            mainViewModel.appInsets.collectLatest {
+                binding.textInputLayout.setPadding(
+                    view.paddingLeft, view.paddingTop, view.paddingRight,
+                    it.imeInsets.bottom
+                )
+            }
         }
 
         // Wire up the send button.
@@ -68,11 +70,15 @@ class AgentTabFragment : Fragment() {
             val message = binding.aiMessageInput.text.toString()
             runIfModelSelected(modelId) { selectedModelId ->
                 // Perform git commit if needed.
-                if (!gitViewModel.isCloneNeeded() && binding.autoCommit.isChecked) {
+                if (gitViewModel.autoCommit()) {
                     gitViewModel.commit("Agent: $message")
                 }
                 val fullPath = mainViewModel.fullPath.value
-                viewModel.addAgentMessage(message, selectedModelId, fullPath.path, fullPath.fileName)
+                viewModel.addAgentMessage(
+                    message, selectedModelId,
+                    fullPath.path, fullPath.fileName,
+                    binding.nativeCodeSwitch.isChecked
+                )
                 // Clear the message input.
                 binding.aiMessageInput.setText("")
                 // Dismiss the bottom sheet once the message is sent.
@@ -104,7 +110,7 @@ class AgentTabFragment : Fragment() {
 
     private fun runIfModelSelected(modelId: String?, action: (modelId: String) -> Unit) {
         if (modelId == null) {
-            Toast.makeText(requireContext(), "Please select a model", Toast.LENGTH_SHORT).show()
+            showToast("Please select a model")
         } else {
             action(modelId)
         }

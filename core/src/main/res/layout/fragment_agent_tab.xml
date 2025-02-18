@@ -3,7 +3,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto">
 
     <data>
-        <!-- Import any classes or variables if needed -->
+
         <import type="com.bulifier.core.R" />
     </data>
 
@@ -12,7 +12,6 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- Model Spinner Container -->
         <LinearLayout
             android:id="@+id/modelSpinnerContainer"
             android:layout_width="wrap_content"
@@ -20,8 +19,8 @@
             android:layout_margin="2dp"
             android:orientation="vertical"
             android:setVisible="@{R.bool.show_model_spinner}"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toTopOf="parent">
+            app:layout_constraintBottom_toTopOf="@+id/textInputLayout"
+            app:layout_constraintStart_toStartOf="parent">
 
             <TextView
                 android:layout_width="wrap_content"
@@ -38,18 +37,16 @@
                 android:layout_gravity="center" />
         </LinearLayout>
 
-        <!-- AI Message Input -->
+        <!-- AI Message Input Layout -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/textInputLayout"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp"
-            android:gravity="top|start"
             android:hint="Enter message"
-            app:layout_constraintBottom_toTopOf="@id/cancelButton"
+            app:layout_constraintBottom_toTopOf="@id/sendMessageButton"
             app:layout_constraintEnd_toEndOf="parent"
             app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/modelSpinnerContainer">
+            app:layout_constraintVertical_chainStyle="packed">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/aiMessageInput"
@@ -61,40 +58,43 @@
                 android:scrollbars="vertical" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Auto-commit Switch -->
+        <!-- Native Code Switch -->
         <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/autoCommit"
+            android:id="@+id/nativeCodeSwitch"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:checked="true"
-            android:text="Commit before run"
-            android:textSize="12sp"
-            app:layout_constraintStart_toStartOf="parent"
-            app:layout_constraintTop_toBottomOf="@id/textInputLayout" />
-
-        <!-- Cancel Button -->
-        <Button
-            android:id="@+id/cancelButton"
-            style="@style/Widget.AppCompat.Button.Borderless"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:layout_marginBottom="8dp"
-            android:text="Cancel"
-            android:textColor="@color/folder_color"
+            android:text="Native Code"
+            android:textSize="12sp"
             app:layout_constraintBottom_toBottomOf="parent"
-            app:layout_constraintEnd_toStartOf="@+id/sendMessageButton" />
+            app:layout_constraintStart_toStartOf="parent" />
 
-        <!-- Send Button -->
+        <!-- Send Message Button -->
         <Button
             android:id="@+id/sendMessageButton"
             style="@style/Widget.AppCompat.Button.Borderless"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
             android:layout_marginBottom="8dp"
             android:text="Send"
             android:textColor="@color/folder_color"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent" />
+
+        <!-- Cancel Button (horizontally chained with Send) -->
+        <Button
+            android:id="@+id/cancelButton"
+            style="@style/Widget.AppCompat.Button.Borderless"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="8dp"
+            android:layout_marginBottom="8dp"
+            android:text="Cancel"
+            android:textColor="@color/folder_color"
+            app:layout_constraintBottom_toBottomOf="parent"
+            app:layout_constraintEnd_toStartOf="@id/sendMessageButton" />
 
     </androidx.constraintlayout.widget.ConstraintLayout>
 </layout>

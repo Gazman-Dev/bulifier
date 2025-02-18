@@ -16,6 +16,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.widget.PopupMenu
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
@@ -24,12 +25,14 @@ import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.bulifier.core.R
+import com.bulifier.core.databinding.DialogManageImportsBinding
 import com.bulifier.core.databinding.DialogSyncOptionsBinding
 import com.bulifier.core.databinding.MainFragmentBinding
+import com.bulifier.core.db.File
 import com.bulifier.core.db.SyncMode
 import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.navigation.findNavController
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
 import com.bulifier.core.security.ProductionSecurityFactory
 import com.bulifier.core.security.UiVerifier
 import com.bulifier.core.ui.GitUiHelper
@@ -39,6 +42,8 @@ import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.ai.ModelsHelper
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.main.files.FilesAdapter
+import com.bulifier.core.ui.main.imports.ImportAdapter
+import com.bulifier.core.utils.showToast
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import dagger.hilt.android.AndroidEntryPoint
@@ -114,6 +119,10 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             viewModel.reloadSchemas()
         }
 
+        binding.imports.setOnClickListener {
+            showManageImportsDialog()
+        }
+
         binding.resetSchemasButton.setOnClickListener {
             viewModel.resetSystemSchemas()
         }
@@ -181,7 +190,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             }
         }
 
-        if(isFileMode){
+        if (isFileMode) {
             updateFileContentView(viewModel.openedFile.value != null)
         }
     }
@@ -251,6 +260,9 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
                     .show()
             } else {
                 viewLifecycleOwner.lifecycleScope.launch {
+                    if (gitViewModel.autoCommit()) {
+                        gitViewModel.commit("Pre sync - syncAll=$syncAll syncBullets=$syncBullets")
+                    }
                     historyModel.sync(
                         if (syncBullets) {
                             SyncMode.BULLET
@@ -288,7 +300,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         )
 
         viewLifecycleOwner.lifecycleScope.launch {
-            Prefs.path.flow.combine(viewModel.openedFile) { path, openFile ->
+            AppSettings.path.flow.combine(viewModel.openedFile) { path, openFile ->
                 if (openFile != null) {
                     null
                 } else {
@@ -308,7 +320,7 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
             }
 
             launch {
-                Prefs.template.flow.collectLatest { template ->
+                AppSettings.project.collectLatest { project ->
                     updateFileContentView(viewModel.openedFile.value != null)
                 }
             }
@@ -322,12 +334,13 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
     }
 
     private fun updateFileContentView(isFileOpen: Boolean) {
-        if(isFileMode && !isFileOpen){
+        if (isFileMode && !isFileOpen) {
             findNavController().popBackStack()
             return
         }
         binding.recyclerView.isVisible = !isFileOpen
         binding.fileContent.isVisible = isFileOpen
+        binding.imports.isVisible = isFileOpen
 
         uiVerifier.verifyRunButton(binding.runButton, isFileOpen)
         uiVerifier.verifyReleaseButton(binding.releaseButton, isFileOpen)
@@ -430,5 +443,71 @@ class MainFragment : BaseFragment<MainFragmentBinding>() {
         }
     }
 
+    private fun showManageImportsDialog() {
+        // Inflate the dialog view using view binding.
+        val binding = DialogManageImportsBinding.inflate(LayoutInflater.from(requireContext()))
 
+        // This mutable list will be our local copy to support optimistic UI updates.
+        val currentImports = mutableListOf<File>()
+
+        // Set up the RecyclerView adapter. Note that when the user clicks the X button,
+        // we update the local list immediately before calling the ViewModel.
+        lateinit var adapter: ImportAdapter
+        adapter = ImportAdapter { file ->
+            // Optimistically remove the file.
+            currentImports.remove(file)
+            adapter.submitList(currentImports.toList())
+            viewModel.removeImport(file)
+        }
+        binding.recyclerImports.layoutManager = LinearLayoutManager(requireContext())
+        binding.recyclerImports.adapter = adapter
+
+        // Show the dialog immediately.
+        AlertDialog.Builder(requireContext())
+            .setTitle("Manage Imports")
+            .setView(binding.root)
+            .setPositiveButton("Done", null)
+            .show()
+
+        // Load the initial list of current imports from the database.
+        lifecycleScope.launch {
+            val importsFromDb = viewModel.getImports()
+            currentImports.clear()
+            currentImports.addAll(importsFromDb)
+            adapter.submitList(currentImports.toList())
+        }
+
+        // Prepare available suggestions.
+        var availableFiles: List<File> = emptyList()
+        lifecycleScope.launch {
+            availableFiles = viewModel.getAllImports() // suspend function returning List<File>
+// Map each File to its full path string.
+            val suggestionStrings = availableFiles.map { it.fullPath }
+            val suggestionsAdapter = ImportSuggestionsAdapter(
+                requireContext(),
+                android.R.layout.simple_dropdown_item_1line,
+                suggestionStrings
+            )
+            binding.autoCompleteImport.setAdapter(suggestionsAdapter)
+            binding.autoCompleteImport.threshold = 1  // start suggesting after one character
+        }
+
+        // When the user clicks the Add button, update the list optimistically.
+        binding.btnAddImport.setOnClickListener {
+            val input = binding.autoCompleteImport.text.toString().trim()
+            if (input.isNotEmpty()) {
+                // Look up the File object corresponding to the full path string.
+                val fileToAdd = availableFiles.find { it.fullPath == input }
+                if (fileToAdd != null && !currentImports.contains(fileToAdd)) {
+                    // Optimistic addition: update the local list first.
+                    currentImports.add(fileToAdd)
+                    adapter.submitList(currentImports.toList())
+                    viewModel.addImport(fileToAdd)
+                    binding.autoCompleteImport.text.clear()
+                } else {
+                    showToast("Import not found")
+                }
+            }
+        }
+    }
 }

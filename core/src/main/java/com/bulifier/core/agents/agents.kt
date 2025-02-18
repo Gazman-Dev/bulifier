@@ -6,6 +6,6 @@ val AGENTS_MAP = mutableMapOf(
     "SIMPLE_AGENT" to SimpleAgent::class.java
 )
 
-interface Agent{
+interface Agent {
     suspend fun process(historyItem: HistoryItem)
 }

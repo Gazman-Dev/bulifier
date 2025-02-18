@@ -7,7 +7,7 @@ import androidx.work.WorkManager
 import androidx.work.workDataOf
 import com.bulifier.core.db.HistoryStatus
 import com.bulifier.core.db.db
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -22,15 +22,15 @@ object AiDataManager {
     private val scope = CoroutineScope(job + Dispatchers.IO)
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    fun startListening(context:Context) {
-        val historyFlow = Prefs.projectId.flow
-            .flatMapLatest { projectId ->
+    fun startListening(context: Context) {
+        val historyFlow = AppSettings.project
+            .flatMapLatest { project ->
                 context.db.historyDao().getHistoryIdsByStatuses(
                     statuses = listOf(
                         HistoryStatus.SUBMITTED,
                         HistoryStatus.RE_APPLYING
                     ),
-                    projectId = projectId
+                    projectId = project.projectId
                 )
             }
 

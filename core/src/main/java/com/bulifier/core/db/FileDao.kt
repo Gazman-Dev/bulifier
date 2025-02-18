@@ -5,6 +5,7 @@ import android.content.Context
 import android.util.Log
 import androidx.lifecycle.LiveData
 import androidx.paging.PagingSource
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
@@ -37,8 +38,13 @@ interface FileDao {
         projectId: Long,
         destination: java.io.File,
         clearOldFiles: Boolean,
-        extensionsBlackList:List<String>,
-    ) = DbSyncHelper(context).exportProject(projectId, destination, clearOldFiles, extensionsBlackList)
+        extensionsBlackList: List<String>,
+    ) = DbSyncHelper(context).exportProject(
+        projectId,
+        destination,
+        clearOldFiles,
+        extensionsBlackList
+    )
 
     @Transaction
     suspend fun localToDb(context: Context, projectId: Long) =
@@ -129,34 +135,38 @@ interface FileDao {
     @Update()
     suspend fun updateContent(content: Content): Int
 
-    @Query("UPDATE files SET size = :size, hash = :hash, sync_hash = :syncHash WHERE file_id = :fileId")
-    suspend fun updateFileMetaData(fileId: Long, size: Long, hash: Long, syncHash: Long)
+    @Query("UPDATE files SET size = :size, hash = :hash WHERE file_id = :fileId")
+    suspend fun updateFileMetaData(fileId: Long, size: Long, hash: Long)
 
     @Transaction
-    suspend fun insertContentAndUpdateFileMetaData(content: Content, syncHash: Long = -1) {
+    suspend fun insertContentAndUpdateFileMetaData(content: Content) {
         upsertContent(content)
         updateFileMetaData(
             content.fileId,
             content.content.length.toLong(),
-            calculateStringHash(content.content),
-            syncHash
+            calculateStringHash(content.content)
         )
     }
 
     @Transaction
-    suspend fun updateContentAndFileMetaData(content: Content, syncHash: Long = -1): Int {
+    suspend fun updateContentAndFileMetaData(content: Content): Int {
         val count = updateContent(content)
         updateFileMetaData(
             content.fileId,
             content.content.length.toLong(),
-            calculateStringHash(content.content),
-            syncHash
+            calculateStringHash(content.content)
         )
         return count
     }
 
+    @Transaction
+    suspend fun insertFile(file: File): Long {
+        Log.d("insertFile", "file: $file")
+        return _insertFile(file)
+    }
+
     @Insert(onConflict = OnConflictStrategy.Companion.IGNORE)
-    suspend fun insertFile(file: File): Long
+    suspend fun _insertFile(file: File): Long
 
     @Transaction
     suspend fun insertFileAndVerifyPath(file: File): Long {
@@ -237,7 +247,7 @@ interface FileDao {
                     val destination: java.io.File = getBinaryFile(context, fileId, projectId)
                     val inputStream = context.assets.open(fullPath)
                     val size = copyStreamToFile(inputStream, destination)
-                    updateFileMetaData(fileId, size, -1L, -1L)
+                    updateFileMetaData(fileId, size, -1L)
                 } else {
                     val content = context.assets.open(fullPath).bufferedReader()
                         .use { it.readText() }
@@ -368,7 +378,10 @@ interface FileDao {
         """SELECT
             file_id 
         FROM files
-        WHERE files.path || '/' || files.file_name in (:filesNames) AND files.project_id = :projectId
+        WHERE (case when files.path is null or files.path = '' 
+                then files.file_name 
+                else files.path || '/' || files.file_name end) 
+            in (:filesNames) AND files.project_id = :projectId
         """
     )
     suspend fun getFilesIds(filesNames: List<String>, projectId: Long): List<Long>
@@ -552,7 +565,7 @@ interface FileDao {
     suspend fun isProjectEmpty(projectId: Long): Boolean
 
     @Query("SELECT * FROM projects WHERE project_id = :projectId")
-    suspend fun getProject(projectId: Long): Project
+    suspend fun getProject(projectId: Long): Project?
 
     @Query("SELECT * FROM projects WHERE project_name = :projectName")
     suspend fun getProject(projectName: String): Project?
@@ -575,4 +588,108 @@ interface FileDao {
     suspend fun transaction(function: suspend () -> Unit) {
         function()
     }
+
+
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertDependency(dependencies: List<Dependency>)
+
+    @Transaction
+    suspend fun insertDependencies(fileId: Long, dependencies: List<Long>, projectId: Long) {
+        val dependencyEntities = dependencies.map { dependencyFileId ->
+            Dependency(
+                fileId = fileId,
+                dependencyFileId = dependencyFileId,
+                projectId = projectId
+            )
+        }
+        insertDependency(dependencyEntities)
+    }
+
+    @Query(
+        """
+        SELECT files.* FROM dependencies 
+            join files on dependency_file_id = files.file_id
+        WHERE dependencies.file_id = :fileId and dependencies.project_id = :projectId
+    """
+    )
+    suspend fun getDependencies(fileId: Long, projectId: Long): List<File>
+
+    @Query(
+        """
+        SELECT dependency_file_id FROM dependencies
+        WHERE file_id in (:fileIds) and project_id = :projectId
+    """
+    )
+    fun getDependenciesIds(fileIds: List<Long>, projectId: Long): List<Long>
+
+    @Insert(onConflict = OnConflictStrategy.Companion.IGNORE)
+    suspend fun addImport(dependency: Dependency)
+
+    @Query("delete from dependencies where file_id = :fileId and dependency_file_id = :dependencyFileId and project_id = :projectId")
+    suspend fun removeImport(fileId: Long, dependencyFileId: Long, projectId: Long)
+
+    @Query(
+        """
+        SELECT files.* FROM dependencies 
+            join files on dependency_file_id = files.file_id
+        WHERE dependencies.file_id = :fileId and dependencies.project_id = :projectId
+        order by path, file_name
+    """
+    )
+    suspend fun getImports(fileId: Long, projectId: Long): List<File>
+
+    @Query(
+        """
+        SELECT * FROM files
+        WHERE project_id = :projectId and file_name like '%.bul'
+        and file_id != :fileId and file_id not in (
+            select dependency_file_id from dependencies 
+            where file_id = :fileId and project_id = :projectId        
+        )
+        order by path, file_name
+    """
+    )
+    suspend fun getAllImports(fileId: Long, projectId: Long): List<File>
+
+    @Query(
+        """
+        select 
+            bullets.file_id bullet_file_id, 
+            case when raw.file_id is null then -1 else raw.file_id end raw_file_id
+        from files bullets
+        left join files raw on 
+            bullets.file_name = raw.file_name || ".bul" and 
+            bullets.path = raw.path and
+            bullets.project_id = raw.project_id
+        where (bullets.sync_hash != bullets.hash or bullets.sync_hash == -1 or :forceSync = 1)
+        and bullets.file_name like '%.bul' and bullets.project_id = :projectId
+    """
+    )
+    suspend fun getFilesToSync(projectId: Long, forceSync: Boolean): List<SyncFile>
+
+    @Query("update files set sync_hash = hash where file_id in (:fileIds)")
+    fun markSynced(fileIds: List<Long>)
+
+    @Query("select * from files where file_id in (:fileIds)")
+    fun getFiles(fileIds: List<Long>): List<File>
+
+    @Query(
+        """
+        select native.file_id from files 
+            join files native on 
+                files.path = native.path and 
+                files.file_name = native.file_name || ".bul" and
+                files.project_id = native.project_id
+        where files.file_id in (:fileIds)
+    """
+    )
+    fun getNativeFiles(fileIds: List<Long>): List<Long>
 }
+
+data class SyncFile(
+    @ColumnInfo(name = "bullet_file_id")
+    val bulletsFile: Long,
+
+    @ColumnInfo(name = "raw_file_id")
+    val rawFile: Long
+)

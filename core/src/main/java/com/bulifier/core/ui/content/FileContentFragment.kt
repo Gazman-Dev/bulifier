@@ -1,11 +1,11 @@
 package com.bulifier.core.ui.content
 
-import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.activity.OnBackPressedCallback
+import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
@@ -13,8 +13,11 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.databinding.FileContentFragmentBinding
+import com.bulifier.core.prefs.AppSettings
+import com.bulifier.core.prefs.AppSettings.SETTINGS_BULIFIER
 import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.utils.Logger
+import com.bulifier.core.utils.showToast
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -67,15 +70,20 @@ class FileContentFragment : Fragment() {
         binding.textBox.setIsWrapped(binding.wrapMode.isChecked)
 
         ViewCompat.setOnApplyWindowInsetsListener(binding.contentFrame) { view, insets ->
-            val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
-            val systemBarInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            val imeInsets: Insets = insets.getInsets(WindowInsetsCompat.Type.ime())
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
 
             view.setPadding(
-                systemBarInsets.left,
-                systemBarInsets.top,
-                systemBarInsets.right,
-                imeInsets.bottom
+                0,
+                0,
+                0,
+                0.coerceAtLeast(imeInsets.bottom - systemBars.bottom)
             )
+
+            binding.switchesRow.isVisible = imeInsets.bottom == 0
+
+            viewModel.setInsets(imeInsets, systemBars)
+
             insets
         }
 
@@ -117,6 +125,25 @@ class FileContentFragment : Fragment() {
             }
         }
         binding.textBox.isEditable = binding.editMode.isChecked
+
+        binding.applySettings.setOnClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                AppSettings.reloadSettings()
+                showToast("Settings applied")
+            }
+        }
+        binding.resetDefaults.setOnClickListener {
+            viewLifecycleOwner.lifecycleScope.launch {
+                AppSettings.reloadSettings(true)
+            }
+        }
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            viewModel.fullPath.collectLatest {
+                binding.applySettings.isVisible = it.fullPath == SETTINGS_BULIFIER
+                binding.resetDefaults.isVisible = it.fullPath == SETTINGS_BULIFIER
+            }
+        }
 
         viewLifecycleOwner.lifecycleScope.launch {
             viewModel.fullScreenMode.collect {

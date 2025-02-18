@@ -6,14 +6,14 @@ import android.view.View
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
 import android.widget.Spinner
-import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.bulifier.core.R
 import com.bulifier.core.models.questions.ModelsQuestionsModel
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
 import com.bulifier.core.ui.utils.showQuestionsDialog
+import com.bulifier.core.utils.showToast
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
@@ -26,7 +26,7 @@ class ModelsHelper(
 ) {
     @SuppressLint("ClickableViewAccessibility")
     fun setupModels() {
-        Prefs.models.flow.value.firstOrNull()?.let {
+        AppSettings.models.flow.value.firstOrNull()?.let {
             onModelSelectedListener(it)
         }
         updateBackground()
@@ -40,7 +40,7 @@ class ModelsHelper(
             modelSpinner.adapter = adapter
 
             launch {
-                Prefs.models.flow.collect {
+                AppSettings.models.flow.collect {
                     adapter.clear()
                     adapter.addAll(it + addModelKey)
                     updateBackground()
@@ -98,16 +98,12 @@ class ModelsHelper(
                 if (completed) {
                     val selectedModel = questionsModel.selectedModel
                     if (selectedModel == null) {
-                        Toast.makeText(
-                            context,
-                            "Invalid input",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        showToast("Invalid input")
                     } else {
                         showQuestionsDialog(selectedModel, context)
                             .onEach { selectedModelCompleted ->
                                 if (selectedModelCompleted) {
-                                    Prefs.models.apply {
+                                    AppSettings.models.apply {
                                         val newModel = listOf(selectedModel.modelName)
                                         set(flow.value + newModel)
                                     }
@@ -123,7 +119,7 @@ class ModelsHelper(
     }
 
     private fun updateBackground() {
-        modelSpinner.background = if (Prefs.models.flow.value.isEmpty()) {
+        modelSpinner.background = if (AppSettings.models.flow.value.isEmpty()) {
             ContextCompat.getDrawable(modelSpinner.context, R.drawable.red_background)
         } else {
             null

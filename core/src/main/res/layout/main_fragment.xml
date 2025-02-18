@@ -21,23 +21,32 @@
             app:layout_constraintTop_toTopOf="parent"
             tools:layout_height="50dp" />
 
+        <TextView
+            android:visibility="gone"
+            tools:visibility="visible"
+            android:id="@+id/imports"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:text="Imports | "
+            android:textSize="18sp"
+            android:textStyle="bold"
+            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintTop_toBottomOf="@id/toolbar" />
+
         <HorizontalScrollView
             android:id="@+id/pathContainer"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:layout_marginTop="2dp"
             android:layout_marginEnd="8dp"
-            android:layout_marginBottom="8dp"
             app:layout_constraintEnd_toEndOf="parent"
-            app:layout_constraintStart_toStartOf="parent"
+            app:layout_constraintStart_toEndOf="@+id/imports"
             app:layout_constraintTop_toBottomOf="@+id/toolbar">
 
             <TextView
                 android:id="@+id/path"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
                 android:textSize="18sp"
                 tools:text="Snake / src / main / " />
         </HorizontalScrollView>
@@ -88,7 +97,6 @@
             android:name="com.bulifier.core.ui.content.FileContentFragment"
             android:layout_width="0dp"
             android:layout_height="0dp"
-            android:padding="4dp"
             android:visibility="gone"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintEnd_toEndOf="parent"
@@ -96,24 +104,24 @@
             app:layout_constraintTop_toBottomOf="@+id/pathContainer" />
 
         <ImageButton
-            android:backgroundTint="@color/colorPrimary"
             android:id="@+id/runButton"
             android:layout_width="50dp"
             android:layout_height="50dp"
             android:layout_marginStart="8dp"
             android:layout_marginBottom="16dp"
+            android:backgroundTint="@color/colorPrimary"
             android:src="@drawable/baseline_play_arrow_24"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toStartOf="parent"
             app:tint="@color/folder_color" />
 
         <ImageButton
-            android:backgroundTint="@color/colorPrimary"
             android:id="@+id/releaseButton"
             android:layout_width="50dp"
             android:layout_height="50dp"
             android:layout_marginStart="4dp"
             android:layout_marginBottom="16dp"
+            android:backgroundTint="@color/colorPrimary"
             android:src="@drawable/baseline_rocket_launch_24"
             app:layout_constraintBottom_toBottomOf="parent"
             app:layout_constraintStart_toEndOf="@+id/runButton"

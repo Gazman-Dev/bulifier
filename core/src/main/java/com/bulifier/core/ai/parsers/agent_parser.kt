@@ -1,8 +1,7 @@
-package com.bulifier.core.ai
+package com.bulifier.core.ai.parsers
 
 data class AgentCommand(
     val command: String,
-    val files: List<String>,
     val context: List<String>,
     val instructions: String,
     val path: String?
@@ -24,13 +23,13 @@ fun parseAgentResponse(response: String): AgentData {
 
     val lines = response.lines().map { it.trim() }
     var currentCommand: String? = null
-    val currentFiles = mutableListOf<String>()
     val currentContext = mutableListOf<String>()
-    var currentInstructions = StringBuilder()
+    var currentInstructions = mutableListOf<String>()
     var processingAction = false
     var currentActionType: String? = null
-    var currentBlock: String? = null // Tracks the current section: "files", "context", "instructions", etc.
-    var currentPath:String? = null
+    var currentBlock: String? =
+        null // Tracks the current section: "files", "context", "instructions", etc.
+    var currentPath: String? = null
 
     for (line in lines) {
         when {
@@ -40,7 +39,6 @@ fun parseAgentResponse(response: String): AgentData {
                     agentCommands.add(
                         AgentCommand(
                             currentCommand,
-                            currentFiles.toList(),
                             currentContext.toList(),
                             currentInstructions.toString().trim(),
                             currentPath
@@ -49,7 +47,6 @@ fun parseAgentResponse(response: String): AgentData {
                 }
                 // Start new command
                 currentCommand = line.substringAfter(":").trim()
-                currentFiles.clear()
                 currentContext.clear()
                 currentInstructions.clear()
                 currentBlock = null
@@ -70,7 +67,7 @@ fun parseAgentResponse(response: String): AgentData {
 
             line.lowercase().startsWith("instructions:") -> {
                 currentBlock = "instructions"
-                currentInstructions.append(line.substringAfter(":").trim()).append(" ")
+                currentInstructions += (line.substringAfter(":").trim())
             }
 
             line.lowercase().startsWith("action:") -> {
@@ -86,6 +83,7 @@ fun parseAgentResponse(response: String): AgentData {
                     "move" -> if (parts.size == 2) {
                         agentActions.add(AgentAction.Move(parts[0], parts[1]))
                     }
+
                     "delete" -> if (parts.size == 1) {
                         agentActions.add(AgentAction.Delete(parts[0]))
                     }
@@ -95,19 +93,18 @@ fun parseAgentResponse(response: String): AgentData {
             line.startsWith("-") -> {
                 // Add to current block
                 when (currentBlock) {
-                    "files" -> currentFiles.add(line.removePrefix("-").trim())
-                    "context" -> currentContext.add(line.removePrefix("-").trim())
+                    "context" -> currentContext.add(normalizeFilePath(line))
                 }
             }
 
             line.isNotEmpty() && currentBlock == "instructions" -> {
                 // Collect instructions explicitly
-                currentInstructions.append(line).append(" ")
+                currentInstructions += line
             }
 
             line.isNotEmpty() && currentBlock == null -> {
                 // Lines outside of specific blocks are treated as instructions
-                currentInstructions.append(line).append(" ")
+                currentInstructions += line
             }
         }
     }
@@ -117,14 +114,23 @@ fun parseAgentResponse(response: String): AgentData {
         agentCommands.add(
             AgentCommand(
                 currentCommand,
-                currentFiles.toList(),
                 currentContext.toList(),
-                currentInstructions.toString().trim(),
+                currentInstructions.joinToString("\n").trim(),
                 currentPath
             )
         )
     }
 
     return AgentData(agentCommands, agentActions)
+}
+
+private fun normalizeFilePath(pathLine: String): String {
+    return pathLine.replace("""[^a-zA-Z_/.]+""".toRegex(), "").run {
+        if (!this.endsWith(".bul")) {
+            "$this.bul"
+        } else {
+            this
+        }
+    }
 }
 

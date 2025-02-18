@@ -20,7 +20,7 @@
         app:layout_constraintEnd_toStartOf="@+id/deleteButton"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="@id/deleteButton"
-        app:layout_constraintBottom_toBottomOf="@id/deleteButton"/>
+        app:layout_constraintBottom_toBottomOf="@id/deleteButton" />
 
     <ImageView
         android:id="@+id/deleteButton"

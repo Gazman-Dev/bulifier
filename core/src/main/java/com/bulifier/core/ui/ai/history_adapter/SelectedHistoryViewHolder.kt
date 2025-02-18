@@ -105,19 +105,23 @@ class SelectedHistoryViewHolder(
             }
         }
 
-        ViewCompat.setOnApplyWindowInsetsListener(binding.prompt.chatBox) { view, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(binding.prompt.chatBoxContainer) { view, insets ->
             val imeVisible = insets.isVisible(WindowInsetsCompat.Type.ime())
             val imeInsets = insets.getInsets(WindowInsetsCompat.Type.ime())
             val systemBarInsets = insets.getInsets(WindowInsetsCompat.Type.systemBars())
 
             binding.prompt.path.isVisible = !imeVisible
             binding.prompt.spinnersContainer.isVisible = !imeVisible
+            binding.prompt.sendButton.isVisible = !imeVisible
+            binding.prompt.draftButton.isVisible = !imeVisible
+            binding.prompt.discardButton.isVisible = !imeVisible
+
 
             view.updatePaddingRelative(
-                start = systemBarInsets.left,
-                top = if (imeVisible) view.paddingTop else 0, // Preserve original top padding only
-                end = systemBarInsets.right,
-                bottom = if (imeVisible) imeInsets.bottom else 0
+                start = 0,
+                top = 0,
+                end = 0,
+                bottom = if (imeVisible) imeInsets.bottom - systemBarInsets.bottom else 0
             )
             WindowInsetsCompat.CONSUMED
         }

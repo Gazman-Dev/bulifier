@@ -8,7 +8,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
 import android.widget.ArrayAdapter
-import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -19,6 +18,7 @@ import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.ui.core.BaseFragment
 import com.bulifier.core.ui.navigateToMain
+import com.bulifier.core.utils.showToast
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -151,7 +151,7 @@ class ProjectsFragment : BaseFragment<ProjectsFragmentBinding>() {
             return
         }
         if (binding.templates.selectedItemPosition == 0) {
-            Toast.makeText(requireContext(), "Please select a template", Toast.LENGTH_SHORT).show()
+            showToast("Please select a template")
             return
         }
         lifecycleScope.launch {

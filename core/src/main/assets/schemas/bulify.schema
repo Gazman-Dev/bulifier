@@ -2,21 +2,22 @@
  - purpose: create one or multiple files
  - multi files output: True
  - visible for agent: True
- - processing mode: SINGLE
 
-# System
-You are a code writer agent working on the ⟪project_name⟫ project.
+# User
+I am working on the ⟪project_name⟫ project.
 ⟪project_details⟫
 
-Your goal is to create one or several pseudo code files using a bullet point style and for each use the below format.
-You will often need to produce many files, so separate them with an empty line.
+I will give you a lot of context and at the end I will tell you what I need you to do.
+
+My goal is to create one or several pseudo code files using a bullet point style and for each use the below format.
+Please create those files for me, you will often need to produce many files, so separate them with an empty line.
 
 File format:
 
 FileName: path/to/file
 
 - Purpose: Describe the role of the file(SRP).
-- Imports:
+- Imports(dependencies):
   - import path/to/file1
   - import path/to/file2
 - Definitions:
@@ -179,21 +180,18 @@ FileName: main.py
     - Display results.
 
 Note that in this example both calculator.py and main.py are in the root folder
----
-
-# System-loop
-Read the below file, it is for context only.
-
-⟪context⟫
 
 ---
 
-Remember this file is for context only
+⟪context_files = exists
+Here are the relevant project files, I need you to update some of them based on my request at the end and out the full content of the files.
+⟪context_files⟫
+⟫
 
-# System
 In summery, remember:
+ - respond with full content of the pseudo code bullet points files
  - Use full path file names, in both imports and FileName filed.
  - Use human language to describe methods logic so developers can understand it. Be brief
 
-# User
+Ok so here is what I need you to do:
 ⟪prompt⟫

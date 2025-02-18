@@ -1,6 +1,8 @@
 package com.bulifier.core.ui.ai.history_adapter
 
+import android.icu.text.NumberFormat
 import android.view.View
+import androidx.core.view.isVisible
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.RecyclerView
@@ -10,6 +12,7 @@ import com.bulifier.core.db.HistoryStatus
 import com.bulifier.core.ui.ai.HistoryViewModel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
+import java.util.Locale
 import kotlin.math.min
 
 abstract class BaseHistoryViewHolder(
@@ -28,6 +31,13 @@ abstract class BaseHistoryViewHolder(
             onToolbarClick(historyItem)
         }
 
+        binding.cost.isVisible = historyItem?.cost != null
+        binding.cost.text = historyItem?.cost?.let {
+            "${formatDouble(it.toDouble())} tokens"
+        } ?: run {
+            ""
+        }
+
         binding.date.text = historyItem?.lastUpdated?.toString()
 
         historyItem?.lastUpdated?.let {
@@ -37,9 +47,9 @@ abstract class BaseHistoryViewHolder(
         }
 
         viewLifecycleOwner.lifecycleScope.launch {
-            val agentPrefix = if(historyItem?.schema == "agent"){
+            val agentPrefix = if (historyItem?.schema == "agent") {
                 "\uD83E\uDD16 "
-            }else ""
+            } else ""
             val title = (viewModel.getErrorMessages(historyItem?.promptId ?: -1)
                 ?: historyItem?.prompt) ?: ""
             binding.title.text = agentPrefix + title.substring(0, min(title.length, 100))
@@ -50,23 +60,26 @@ abstract class BaseHistoryViewHolder(
             }
         }
 
-        binding.status.text = if (historyItem == null) {
-            "---"
-        } else if (historyItem.progress == -1f) {
-            when (historyItem.status) {
-                HistoryStatus.ERROR -> "Error"
-                HistoryStatus.PROMPTING -> "Prompting"
-                HistoryStatus.SUBMITTED -> "Submitted"
-                HistoryStatus.PROCESSING -> "Processing"
-                HistoryStatus.RESPONDED -> "Success"
-                HistoryStatus.RE_APPLYING -> "Re-Applying"
-            }
-        } else if (historyItem.progress == 1f) {
-            "Success"
-        } else {
-            "${(historyItem.progress * 100).toInt()}%"
+        binding.status.text = when (historyItem?.status) {
+            null -> "---"
+            HistoryStatus.ERROR -> "Error"
+            HistoryStatus.PROMPTING -> "Prompting"
+            HistoryStatus.SUBMITTED -> "Submitted"
+            HistoryStatus.PROCESSING -> "Processing"
+            HistoryStatus.RESPONDED -> "Success"
+            HistoryStatus.RE_APPLYING -> "Re-Applying"
         }
+
     }
 
     abstract fun onToolbarClick(historyItem: HistoryItem?)
+}
+
+private fun formatDouble(value: Double, locale: Locale = Locale.getDefault()): String {
+    val formatter = NumberFormat.getNumberInstance(locale).apply {
+        maximumFractionDigits = 2 // Set maximum decimal points to 2
+        minimumFractionDigits = 0 // Optional: Avoid trailing zeros
+        isGroupingUsed = true    // Use grouping separators (e.g., commas)
+    }
+    return formatter.format(value)
 }

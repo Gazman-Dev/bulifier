@@ -36,6 +36,7 @@ android {
         buildConfigField "String", "GIT_USERNAME", '""'
         buildConfigField "String", "GIT_PASSWARD", '""'
         buildConfigField "String", "GIT_REPO", '""'
+        buildConfigField "Boolean", "NAVIGATION_LOGS", 'false'
     }
 
     buildTypes {
@@ -52,6 +53,8 @@ android {
             buildConfigField "String", "GIT_USERNAME", getPropertyQuoted("git-username", properties)
             buildConfigField "String", "GIT_PASSWARD", getPropertyQuoted("git-passward", properties)
             buildConfigField "String", "GIT_REPO", getPropertyQuoted("git-repo", properties)
+
+            buildConfigField "Boolean", "NAVIGATION_LOGS", getPropertyQuotedBoolean("navigation-logs", properties)
         }
     }
     compileOptions {
@@ -76,12 +79,19 @@ private static def getPropertyQuoted(String propName, Properties properties) {
     return "\"" + (properties.getProperty(propName) ?: "") + "\""
 }
 
+private static def getPropertyQuotedBoolean(String propName, Properties properties) {
+    return (properties.getProperty(propName) ?: "false")
+}
+
 kapt {
     correctErrorTypes true
 }
 
 dependencies {
     implementation project(":jgit")
+
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:2.18.2")
+    implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.18.2")
 
     implementation 'com.github.bumptech.glide:glide:4.15.1'
     implementation 'jp.wasabeef:glide-transformations:4.3.0'
@@ -111,10 +121,10 @@ dependencies {
     kapt "androidx.room:room-compiler:$room_version"
     annotationProcessor "androidx.room:room-compiler:$room_version"
 
-    implementation "androidx.paging:paging-runtime-ktx:3.3.5"
-    implementation "androidx.paging:paging-common-ktx:3.3.5"
+    implementation "androidx.paging:paging-runtime-ktx:3.3.6"
+    implementation "androidx.paging:paging-common-ktx:3.3.6"
 
-    implementation 'androidx.fragment:fragment-ktx:1.8.5'
+    implementation 'androidx.fragment:fragment-ktx:1.8.6'
 
     implementation 'com.tbuonomo:dotsindicator:5.1.0'
     implementation 'androidx.core:core-ktx:1.15.0'

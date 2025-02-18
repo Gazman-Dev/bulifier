@@ -1,1 +1,3 @@
+# prefix your dependencies with `module` if the script should be loaded as an ES module.
+# Ex: module three@0.173.0
 phaser@3.55.2

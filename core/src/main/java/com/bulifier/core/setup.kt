@@ -14,14 +14,14 @@ import com.bulifier.core.models.questions.CLASS_GROUP_OPEN_AI
 import com.bulifier.core.models.questions.DebugQuestionsModel
 import com.bulifier.core.models.questions.ModelsQuestionsModel
 import com.bulifier.core.models.questions.OpenAiQuestionsModel
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
 import com.bulifier.core.schemas.SchemaModel
 
 class Setup : ContentProvider() {
 
     override fun onCreate(): Boolean {
         context!!.apply {
-            Prefs.initialize(applicationContext)
+            AppSettings.initialize(applicationContext)
             SchemaModel.init(applicationContext)
             AiDataManager.startListening(applicationContext)
         }

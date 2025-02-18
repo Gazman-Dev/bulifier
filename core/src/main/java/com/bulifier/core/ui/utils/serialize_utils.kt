@@ -1,5 +1,6 @@
 package com.bulifier.core.ui.utils
 
+import com.bulifier.core.prefs.AppSettings
 import kotlin.reflect.KClass
 import kotlin.reflect.full.createInstance
 
@@ -14,7 +15,7 @@ fun <T : Any> createInstance(className: String): T? {
         val kClass = Class.forName(className).kotlin as KClass<T>
         kClass.createInstance()
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppSettings.appLogger.e(e)
         null
     }
 }

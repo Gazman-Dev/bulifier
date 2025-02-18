@@ -9,7 +9,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bulifier.core.databinding.ItemProjectBinding
 import com.bulifier.core.db.Project
 import com.bulifier.core.git.GitViewModel
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
 
 class ProjectsAdapter(
     private val mainViewModel: MainViewModel,
@@ -35,8 +35,8 @@ class ProjectsAdapter(
                         setTitle("Delete Project")
                         setMessage("Are you sure you want to delete the project? This action will delete all files, logs, and history related to this project.")
                         setPositiveButton("Delete") { _, _ ->
-                            if (Prefs.projectId.flow.value == project.projectId) {
-                                Prefs.clear()
+                            if (AppSettings.project.value.projectId == project.projectId) {
+                                AppSettings.clear()
                             }
                             mainViewModel.deleteProject(project)
                             gitViewModel.deleteProject(project.projectName)

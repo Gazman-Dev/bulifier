@@ -11,9 +11,7 @@ import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.widget.FrameLayout
 import android.widget.ImageView
-import android.widget.LinearLayout
 import android.widget.TextView
-import android.widget.Toast
 import android.widget.VideoView
 import androidx.appcompat.app.AlertDialog
 import androidx.core.content.ContextCompat
@@ -22,14 +20,15 @@ import androidx.recyclerview.widget.RecyclerView
 import com.bulifier.core.R
 import com.bulifier.core.databinding.FileItemBinding
 import com.bulifier.core.db.File
+import com.bulifier.core.prefs.AppSettings
 import com.bulifier.core.ui.main.MainViewModel
 import com.bulifier.core.ui.utils.FileType
 import com.bulifier.core.ui.utils.getFileType
 import com.bulifier.core.ui.utils.showErrorDialog
 import com.bulifier.core.ui.utils.showTextDialog
+import com.bulifier.core.utils.showToast
 import com.bumptech.glide.Glide
 import com.bumptech.glide.load.DataSource
-import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.bumptech.glide.load.engine.GlideException
 import com.bumptech.glide.request.RequestListener
 import com.bumptech.glide.request.target.Target
@@ -63,9 +62,8 @@ class FileViewHolder(
 
     private fun showMenu() {
         val file = file ?: return
-        if (file.path.isBlank() && file.fileName == "schemas") {
-            Toast.makeText(binding.root.context, "Schemas folder is protected", Toast.LENGTH_SHORT)
-                .show()
+        if (file.fullPath in AppSettings.projectSettings.value.protectedPaths) {
+            showToast("${file.fullPath} is protected")
             return
         }
         val options = mutableListOf(
@@ -121,15 +119,19 @@ class FileViewHolder(
                     FileType.IMAGE -> {
                         bindImage(file)
                     }
+
                     FileType.VIDEO -> {
                         bindVideo(file)
                     }
+
                     FileType.FONT -> {
                         bindFont(file)
                     }
+
                     FileType.PDF -> {
                         bindPDF(file)
                     }
+
                     FileType.OTHER -> {
                         bindOtherBinaries(file)
                     }
@@ -225,10 +227,12 @@ class FileViewHolder(
         // Use a container layout to add margins around the ImageView
         val container = FrameLayout(context).apply {
             setPadding(32, 32, 32, 32)
-            addView(imageView, FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT
-            ))
+            addView(
+                imageView, FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.WRAP_CONTENT,
+                    FrameLayout.LayoutParams.WRAP_CONTENT
+                )
+            )
         }
 
         Glide.with(context)
@@ -347,7 +351,8 @@ class FileViewHolder(
         val context = itemView.context
 
         val textView = TextView(context).apply {
-            text = "I love Bulifier! ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 1234567890 !@#$%^&*()_+"
+            text =
+                "I love Bulifier! ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz 1234567890 !@#$%^&*()_+"
             textSize = 24f
             setPadding(32, 32, 32, 32)
 
@@ -404,10 +409,9 @@ class FileViewHolder(
         try {
             context.startActivity(Intent.createChooser(pdfIntent, "Open PDF with..."))
         } catch (_: ActivityNotFoundException) {
-            Toast.makeText(context, "No PDF reader found.", Toast.LENGTH_SHORT).show()
+            showToast("No PDF reader found.")
         }
     }
-
 
 
 }
