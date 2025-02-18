@@ -2,8 +2,10 @@ import android.content.Context
 import android.content.res.AssetManager
 import android.util.Log
 import com.bulifier.core.db.Content
+import com.bulifier.core.db.FileData
 import com.bulifier.core.db.db
 import com.bulifier.core.db.getBinaryFile
+import com.bulifier.core.prefs.AppSettings
 import java.io.File
 import java.io.InputStream
 import com.bulifier.core.db.File as DbFile
@@ -29,6 +31,70 @@ class DbSyncHelper(
 
 
         processDirectory(projectDir, "", projectId)
+        extractDependencies(projectId)
+    }
+
+    private suspend fun extractDependencies(projectId: Long) {
+        val bulletFiles = db.fileDao().loadBulletFiles(projectId)
+        extractDependencies(bulletFiles, projectId)
+
+    }
+
+    suspend fun extractDependencies(bulletFiles: List<FileData>, projectId: Long) {
+        bulletFiles.forEach { fileData ->
+            val endOfImportsMark = fileData.content.indexOf("\n\n")
+            if (endOfImportsMark == -1) {
+                return@forEach
+            }
+            val imports = extractImports(fileData.content.substring(0, endOfImportsMark))
+            if (imports.isEmpty()) {
+                return@forEach
+            }
+            val dependencies = imports.mapNotNull {
+                db.fileDao()
+                    .getFileId(
+                        it.substringBeforeLast("/", ""),
+                        it.substringAfterLast("/"),
+                        projectId
+                    )
+            }
+            if (dependencies.isNotEmpty()) {
+                db.fileDao().insertDependencies(fileData.fileId, dependencies, projectId)
+            }
+            db.fileDao().updateContentAndFileMetaData(
+                Content(fileData.fileId, fileData.content.substring(endOfImportsMark + 2).trim())
+            )
+        }
+    }
+
+    private fun isPathChar(ch: Char): Boolean {
+        return ch.isLetterOrDigit() || ch == '/' || ch == '.' || ch == '_' || ch == '-'
+    }
+
+    private fun extractImports(content: String): List<String> {
+        var skip = false
+        return content.lines().mapNotNull { line ->
+            // Find the index of "import"
+            if (skip || !line.startsWith("import")) {
+                skip = true
+                null
+            } else {
+                var i = "import".length
+
+                // Skip all non-path characters (e.g. spaces, parentheses, etc.)
+                while (i < line.length && !isPathChar(line[i])) {
+                    i++
+                }
+
+                // Now capture the file path by iterating while characters are valid.
+                val start = i
+                while (i < line.length && isPathChar(line[i])) {
+                    i++
+                }
+
+                line.substring(start, i)
+            }
+        }
     }
 
 
@@ -102,24 +168,18 @@ class DbSyncHelper(
         db.fileDao().exportFilesAndContents(projectId, extensionsBlackList).forEach { fileData ->
             exportFile(
                 baseDir = destination,
-                relativePath = fileData.path,
-                fileName = fileData.fileName,
-                content = fileData.content,
-                isFile = fileData.isFile
+                fileData,
+                projectId = projectId
             )
         }
 
         db.fileDao().exportBinaryFiles(projectId).forEach {
-            val fileDestination = if (it.path.isEmpty()) {
-                it.fileName
-            } else {
-                "${it.path}/${it.fileName}"
-            }
+            val fileDestination = it.fullPath
             val binaryFile = it.getBinaryFile(context)
             try {
                 binaryFile.copyTo(File(destination, fileDestination), overwrite = true)
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppSettings.appLogger.e(e)
             }
         }
     }
@@ -139,26 +199,47 @@ class DbSyncHelper(
     }
 
     // Shared function for exporting files
-    private fun exportFile(
+    private suspend fun exportFile(
         baseDir: File,
-        relativePath: String,
-        fileName: String,
-        content: String,
-        isFile: Boolean
+        fileData: FileData,
+        projectId: Long
     ) {
-        val filePath = if (relativePath.isNotEmpty()) {
-            File(baseDir, "${relativePath}/${fileName}")
+        val filePath = if (fileData.path.isNotEmpty()) {
+            File(baseDir, "${fileData.path}/${fileData.fileName}")
         } else {
-            File(baseDir, fileName)
+            File(baseDir, fileData.fileName)
         }
 
-        if (isFile) {
+        if (fileData.isFile) {
             filePath.parentFile?.mkdirs()
-            filePath.writeText(content)
+            filePath.writeText(
+                if (fileData.fileName.endsWith(".bul")) {
+                    addImports(fileData, projectId)
+                } else {
+                    fileData.content
+                }
+            )
         } else {
             filePath.mkdirs()
         }
     }
+
+    private suspend fun addImports(fileData: FileData, projectId: Long) =
+        db.fileDao().getDependencies(
+            fileData.fileId, projectId
+        ).let {
+            if (it.isEmpty()) {
+                fileData.content
+            } else {
+                it.joinToString("\n") {
+                    "import " + if (it.path.isEmpty()) {
+                        it.fileName
+                    } else {
+                        "${it.path}/${it.fileName}"
+                    }
+                } + "\n\n" + fileData.content
+            }
+        }
 }
 
 fun isTextFile(file: File): Boolean {
@@ -184,7 +265,7 @@ private fun isTextStream(inputStream: InputStream, sampleSize: Int = 1024): Bool
         // Check each character in the buffer
         buffer.take(bytesRead).all { byte -> byte.toInt().toChar().isPrintable() }
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppSettings.appLogger.e(e)
         false // Handle file read errors
     }
 }

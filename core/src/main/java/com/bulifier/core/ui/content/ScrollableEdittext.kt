@@ -7,12 +7,11 @@ import android.util.TypedValue
 import android.view.GestureDetector
 import android.view.MotionEvent
 import android.view.ScaleGestureDetector
-import android.view.inputmethod.InputMethodManager
 import android.widget.OverScroller
 import androidx.appcompat.widget.AppCompatEditText
 
 @SuppressLint("ClickableViewAccessibility")
-class ScrollableEditText @JvmOverloads constructor(
+open class ScrollableEditText @JvmOverloads constructor(
     context: Context, attrs: AttributeSet? = null
 ) : AppCompatEditText(context, attrs) {
 

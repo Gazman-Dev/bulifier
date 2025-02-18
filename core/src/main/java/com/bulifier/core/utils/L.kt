@@ -49,6 +49,13 @@ class Logger(val tag: String) {
     }
 
     /**
+     * Logs a debug message.
+     */
+    fun w(message: String) {
+        Log.w(tag, message)
+    }
+
+    /**
      * Logs analytics event and info log.
      */
     fun i(eventName: String, params: Bundle? = null) {

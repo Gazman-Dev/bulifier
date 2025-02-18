@@ -19,7 +19,7 @@ interface HistoryDao {
        CASE WHEN schema = 'agent' then 0 else 1 end as agent_order
     FROM history 
     WHERE project_id = :projectId 
-    ORDER BY created DESC, agent_order ASC
+    ORDER BY prompt_id DESC, agent_order ASC
 """
     )
     fun getHistory(promptId: Long, projectId: Long): PagingSource<Int, HistoryItemWithSelection>
@@ -29,7 +29,7 @@ interface HistoryDao {
     SELECT * 
     FROM history 
         WHERE prompt_id = :promptId 
-    ORDER BY created DESC
+    ORDER BY prompt_id DESC
 """
     )
     fun getHistoryItem(promptId: Long): HistoryItem
@@ -41,32 +41,29 @@ interface HistoryDao {
        CASE WHEN schema = 'agent' then 0 else 1 end as agent_order
     FROM history 
     WHERE project_id = :projectId 
-    ORDER BY created DESC
+    ORDER BY prompt_id DESC
 """
     )
     suspend fun getHistoryDebug(promptId: Long, projectId: Long): List<HistoryItemWithSelection>
 
-    @Query("SELECT prompt_id FROM history WHERE status in (:statuses) and project_id = :projectId order by created")
+    @Query("SELECT prompt_id FROM history WHERE status in (:statuses) and project_id = :projectId order by prompt_id")
     fun getHistoryIdsByStatuses(
         statuses: List<HistoryStatus>,
         projectId: Long
     ): Flow<List<Long>>
-
-    @Query(
-        """update history set status = 'SUBMITTED' where 
-        prompt_id in (:ids) and 
-        ((status = 'PROCESSING' and progress = -1) or (progress < 1 and progress != -1))
-    """
-    )
-    suspend fun updateHistoryStatus(
-        ids: List<Long>
-    )
 
     @Query("update history set status = :newStatus where prompt_id = :id")
     suspend fun updateHistoryStatus(
         id: Long,
         newStatus: HistoryStatus
     )
+
+    @Query(
+        """update history set status = 'SUBMITTED' where 
+        prompt_id in (:ids) and status = 'PROCESSING'
+    """
+    )
+    suspend fun updateHistoryStatus(ids: List<Long>)
 
     @Query("update history set status = 'PROCESSING' where prompt_id = :promptId and status in (:statuses)")
     suspend fun startProcessingHistoryItem(
@@ -82,9 +79,6 @@ interface HistoryDao {
 
     @Update
     suspend fun updateHistory(history: HistoryItem)
-
-    @Query("update history set progress = :progress where prompt_id = :promptId and progress < :progress")
-    suspend fun updateProgress(promptId: Long, progress: Float)
 
     @Query("update history set status = 'ERROR', error_message = :errorMessage where prompt_id = :promptId")
     suspend fun markError(promptId: Long, errorMessage: String)
@@ -111,12 +105,11 @@ interface HistoryDao {
         """
 SELECT 
     SUM(CASE 
-            WHEN progress != -1 THEN 1 - progress
             WHEN status = 'RESPONDED' THEN 0.0
             ELSE 1.0
         END)
 FROM history
-WHERE status NOT IN ('ERROR', 'RESPONDED', 'PROMPTING') or (status = 'RESPONDED' and progress != -1 and progress != 1)
+WHERE status NOT IN ('ERROR', 'RESPONDED', 'PROMPTING')
   AND project_id = :projectId;
 
         """

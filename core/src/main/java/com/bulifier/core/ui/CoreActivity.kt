@@ -10,7 +10,7 @@ import com.bulifier.core.databinding.ActivityMainBinding
 import com.bulifier.core.navigation.NavigationController
 import com.bulifier.core.navigation.NavigationManager
 import com.bulifier.core.navigation.findNavController
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
 import com.bulifier.core.ui.main.MainFragment
 import com.bulifier.core.ui.main.ProjectsFragment
 import dagger.hilt.android.AndroidEntryPoint
@@ -20,7 +20,9 @@ import kotlin.getValue
 abstract class CoreActivity : AppCompatActivity(), NavigationController {
 
     private val binding by lazy { ActivityMainBinding.inflate(layoutInflater) }
-    override val navController = NavigationManager(this, R.id.root)
+    override val navController by lazy {
+        NavigationManager(this, R.id.regularFragments, R.id.cachedFragments)
+    }
 
     protected fun setupUi(savedInstanceState: Bundle?) {
         setContentView(binding.root)
@@ -32,7 +34,7 @@ abstract class CoreActivity : AppCompatActivity(), NavigationController {
     }
 
     private fun setupPadding() {
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.root)) { view, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { view, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             view.setPadding(
                 systemBars.left,
@@ -42,10 +44,6 @@ abstract class CoreActivity : AppCompatActivity(), NavigationController {
             )
             insets
         }
-    }
-
-    override fun finish() {
-        super.finish()
     }
 
     open fun onLoadMainScreen() = navigateToMain()
@@ -64,11 +62,10 @@ private fun navigateToMain(
     navController: NavigationController
 ) {
     when {
-        Prefs.projectName.flow.value.isNotBlank() -> {
+        AppSettings.project.value.projectName.isNotBlank() -> {
             navController.navigate(
                 MainFragment::class.java,
-                clearBackStack = true,
-                cacheFragment = true
+                clearBackStack = true
             )
         }
 

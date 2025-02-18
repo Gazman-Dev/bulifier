@@ -5,7 +5,7 @@ import android.content.Intent
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
-import android.widget.Toast
+import androidx.core.graphics.Insets
 import androidx.core.os.bundleOf
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
@@ -13,21 +13,21 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
 import com.bulifier.core.db.Content
+import com.bulifier.core.db.Dependency
 import com.bulifier.core.db.File
-import com.bulifier.core.db.FileData
 import com.bulifier.core.db.Project
 import com.bulifier.core.db.db
 import com.bulifier.core.db.getBinaryFile
+import com.bulifier.core.prefs.AppSettings
+import com.bulifier.core.prefs.AppSettings.path
 import com.bulifier.core.prefs.PrefBooleanValue
-import com.bulifier.core.prefs.Prefs
-import com.bulifier.core.prefs.Prefs.path
-import com.bulifier.core.prefs.Prefs.projectId
-import com.bulifier.core.prefs.Prefs.projectName
 import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.ui.main.actions.deleteAction
 import com.bulifier.core.ui.main.actions.moveAction
 import com.bulifier.core.ui.utils.copyToClipboard
 import com.bulifier.core.utils.Logger
+import com.bulifier.core.utils.fullPath
+import com.bulifier.core.utils.showToast
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.*
@@ -39,12 +39,19 @@ import java.io.File as JavaFile
 data class FullPath(
     val fileName: String?,
     val path: String
-)
+) {
+    val fullPath: String
+        get() = fullPath(path, fileName ?: "")
+}
 
 data class FileInfo(
     val fileId: Long,
     val fileName: String,
     var editing: Boolean = false
+)
+
+data class AppInsets(
+    val imeInsets: Insets, val systemBars: Insets
 )
 
 class MainViewModel(val app: Application) : AndroidViewModel(app) {
@@ -56,26 +63,34 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     private val _fullPath = MutableStateFlow(FullPath(null, ""))
     val fullScreenMode = MutableStateFlow(false)
 
+    val appInsets: Flow<AppInsets> = MutableStateFlow(AppInsets(Insets.NONE, Insets.NONE))
+
     val wrapping = PrefBooleanValue("text wrapping")
 
     val openedFile: StateFlow<FileInfo?> = _openedFile
     val fileContent: StateFlow<String> = _fileContent
     val fullPath: StateFlow<FullPath> = _fullPath
 
+    fun setInsets(imeInsets: Insets, systemBars: Insets) {
+        appInsets as MutableStateFlow
+        appInsets.value = AppInsets(imeInsets, systemBars)
+    }
+
     @OptIn(ExperimentalCoroutinesApi::class)
-    val pagingDataFlow = combine(path.flow, projectId.flow) { newPath, newProjectId ->
-        newPath to newProjectId
-    }.flatMapLatest { (currentPath, currentProjectId) ->
-        Pager(
-            config = PagingConfig(pageSize = 20),
-            pagingSourceFactory = {
-                app.db.fileDao().fetchFilesByPathAndProjectId(
-                    currentPath,
-                    currentProjectId
-                )
-            }
-        ).flow
-    }.cachedIn(viewModelScope)
+    val pagingDataFlow =
+        combine(path.flow, AppSettings.project) { newPath: String, newProjectId: Project ->
+            newPath to newProjectId
+        }.flatMapLatest { (currentPath, currentProject) ->
+            Pager(
+                config = PagingConfig(pageSize = 20),
+                pagingSourceFactory = {
+                    app.db.fileDao().fetchFilesByPathAndProjectId(
+                        currentPath,
+                        currentProject.projectId
+                    )
+                }
+            ).flow
+        }.cachedIn(viewModelScope)
 
     val projectsFlow = Pager(
         config = PagingConfig(
@@ -109,14 +124,14 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
             combine(
                 path.flow,
                 _openedFile,
-                projectName.flow
-            ) { pathValue, fileInfo, projectNameValue ->
+                AppSettings.project
+            ) { pathValue, fileInfo, project ->
                 val fullPath = if (pathValue.isNotBlank()) {
                     "/$pathValue"
                 } else {
                     ""
                 }
-                FullPath(fileInfo?.fileName, "$projectNameValue$fullPath")
+                FullPath(fileInfo?.fileName, "${project.projectName}$fullPath")
             }.collectLatest { newFullPath ->
                 logger.d("Full path updated to $newFullPath")
                 _fullPath.value = newFullPath
@@ -127,7 +142,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     suspend fun openFileByPath(path: String): Boolean {
         val fileName = path.substringAfterLast("/")
         val path = path.substringBeforeLast("/", "")
-        db.getFile(path, fileName, projectId.flow.value)?.let {
+        db.getFile(path, fileName, AppSettings.project.value.projectId)?.let {
             _openedFile.value = FileInfo(
                 fileId = it.fileId,
                 fileName = it.fileName
@@ -153,7 +168,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         db.getContent(fileId)?.let {
             copyToClipboard(app, it.content)
             logger.d("Content copied to clipboard for fileId: $fileId")
-            Toast.makeText(app, "Copied to clipboard", Toast.LENGTH_SHORT).show()
+            showToast("Copied to clipboard")
         }
     }
 
@@ -190,20 +205,20 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         val projectId = db.createProject(app, project, logger)
         logger.d("New project created with ID: $projectId")
         withContext(Dispatchers.Main) {
-            Prefs.updateProject(project.copy(projectId = projectId))
+            AppSettings.updateProject(project.copy(projectId = projectId))
         }
     }
 
     suspend fun selectProject(project: Project) {
         logger.i("selectProject", bundleOf("projectId" to project.projectId))
         withContext(Dispatchers.Main) {
-            Prefs.updateProject(project)
+            AppSettings.updateProject(project)
         }
     }
 
     fun updatePath(path: String) {
         logger.i("updatePath", bundleOf("path" to path))
-        Prefs.path.set(path)
+        AppSettings.path.set(path)
     }
 
     fun updateFileContent(content: String) {
@@ -221,6 +236,9 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
 
     fun deleteProject(project: Project) = viewModelScope.launch {
         logger.i("deleteProject", bundleOf("projectId" to project.projectId))
+        if (project.projectId == AppSettings.project.value.projectId) {
+            AppSettings.clear()
+        }
         db.deleteProject(project)
         logger.d("Project deleted: ${project.projectId}")
     }
@@ -246,7 +264,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     fun createFolder(folderName: String) {
         logger.i("createFolder", bundleOf("folderName" to folderName))
         viewModelScope.launch {
-            val projectId = projectId.flow.value
+            val projectId = AppSettings.project.value.projectId
             val path = path.flow.value
             val extraPathParts = mutableListOf<String>()
             val pathParts = path.split("[^a-zA-Z0-9]".toRegex()).filter { it.isNotBlank() }
@@ -269,33 +287,34 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
     fun reloadSchemas() {
         logger.i("reloadSchemas")
         viewModelScope.launch {
-            SchemaModel.reloadSchemas(projectId.flow.value)
-            logger.d("Schemas reloaded for projectId: ${projectId.flow.value}")
-            Toast.makeText(app, "Schemas reloaded", Toast.LENGTH_SHORT).show()
+            SchemaModel.reloadSchemas(AppSettings.project.value)
+            logger.d("Schemas reloaded for projectId: ${AppSettings.project.value.projectId}")
+            showToast("Schemas reloaded")
         }
     }
 
     fun resetSystemSchemas() {
         logger.i("resetSystemSchemas")
         viewModelScope.launch {
-            SchemaModel.resetSystemSchemas(projectId.flow.value)
-            logger.d("System schemas reset for projectId: ${projectId.flow.value}")
+            SchemaModel.resetSystemSchemas(AppSettings.project.value)
+            logger.d("System schemas reset for projectId: ${AppSettings.project.value.projectId}")
         }
     }
 
     suspend fun isProjectEmpty(): Boolean {
-        val isEmpty = db.isProjectEmpty(projectId.flow.value)
+        val isEmpty = db.isProjectEmpty(AppSettings.project.value.projectId)
         logger.d("Project is empty: $isEmpty")
         return isEmpty
     }
 
     suspend fun wasProjectJustUpdated(): Boolean {
-        if (projectId.flow.value == -1L) {
+        if (AppSettings.project.value.projectId == -1L) {
             logger.d("Project was not updated: projectId is -1")
             return false
         }
-        val lastUpdated = db.getProject(projectId.flow.value)
-        val wasUpdated = (Date().time - lastUpdated.lastUpdated.time) < 5000
+        val lastUpdated =
+            db.getProject(AppSettings.project.value.projectId)?.lastUpdated?.time ?: 0L
+        val wasUpdated = (Date().time - lastUpdated) < 5000
         logger.d("Project was just updated: $wasUpdated")
 
         return wasUpdated
@@ -367,7 +386,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
                         val id = db.insertFile(
                             File(
                                 fileName = fileName,
-                                projectId = projectId.flow.value,
+                                projectId = AppSettings.project.value.projectId,
                                 isFile = true,
                                 path = path,
                                 isBinary = true
@@ -378,7 +397,7 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
                         destination.parentFile?.mkdirs()
                         val size = saveFile(destination, uri)
                         if (size != -1L) {
-                            db.updateFileMetaData(id, size, -1, -1)
+                            db.updateFileMetaData(id, size, -1)
                         }
                     }
                 }
@@ -397,5 +416,47 @@ class MainViewModel(val app: Application) : AndroidViewModel(app) {
         }
 
         return -1
+    }
+
+    fun addImport(file: File) = viewModelScope.launch {
+        val fileId = openedFile.value?.fileId
+        if (fileId == null) {
+            return@launch
+        }
+        db.addImport(
+            Dependency(
+                fileId = fileId,
+                dependencyFileId = file.fileId,
+                projectId = file.projectId
+            )
+        )
+    }
+
+    fun removeImport(file: File) = viewModelScope.launch {
+        val fileId = openedFile.value?.fileId
+        if (fileId == null) {
+            return@launch
+        }
+        db.removeImport(
+            fileId = fileId,
+            dependencyFileId = file.fileId,
+            projectId = file.projectId
+        )
+    }
+
+    suspend fun getImports(): List<File> {
+        val fileId = openedFile.value?.fileId
+        if (fileId == null) {
+            return emptyList()
+        }
+        return db.getImports(fileId, AppSettings.project.value.projectId)
+    }
+
+    suspend fun getAllImports(): List<File> {
+        val fileId = openedFile.value?.fileId
+        if (fileId == null) {
+            return emptyList()
+        }
+        return db.getAllImports(fileId, AppSettings.project.value.projectId)
     }
 }

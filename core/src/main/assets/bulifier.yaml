@@ -1,0 +1,16 @@
+protected: [
+  "schemas",
+  "bulifier.yaml"
+]
+
+# Supported models
+#  - gpt-4o
+#  - gpt-4o-mini
+#  - o1-mini
+
+models: {
+  bulify: "o1-mini",
+  bulify_native: "o1-mini",
+  agent: "o1-mini",
+  debulify: "o1-mini",
+}

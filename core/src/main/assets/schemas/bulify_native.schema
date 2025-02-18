@@ -1,0 +1,35 @@
+# Settings
+ - purpose: create one or multiple native code files
+ - Multi raw files output: True
+
+# User
+I am working on the ⟪project_name⟫ project.
+⟪project_details⟫
+
+Instructions for Native Code File Updates:
+
+- Your task is to update and one or multiple of the provided files based on the provided update instructions.
+- You may also need to create new files as well
+- For each file, begin with a header specifying the full file path in this format:
+
+
+Files Output format
+I only need the below files content and name, no other text or explanations.
+
+### path/to/file1
+```
+file1 content
+```
+
+---
+
+### path/to/file2
+```
+file2 content
+```
+
+Relevant project Files:
+⟪files_for_context⟫
+
+Update Instructions:  
+⟪prompt⟫

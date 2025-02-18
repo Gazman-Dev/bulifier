@@ -1,56 +1,58 @@
 package com.bulifier.core.schemas
 
 import android.content.Context
+import android.util.Log
 import androidx.annotation.VisibleForTesting
 import com.bulifier.core.db.AppDatabase
 import com.bulifier.core.db.Content
 import com.bulifier.core.db.File
-import com.bulifier.core.db.ProcessingMode
+import com.bulifier.core.db.Project
 import com.bulifier.core.db.Schema
 import com.bulifier.core.db.SchemaSettings
 import com.bulifier.core.db.SchemaType
 import com.bulifier.core.db.db
-import com.bulifier.core.prefs.Prefs
+import com.bulifier.core.prefs.AppSettings
+import com.bulifier.core.prefs.AppSettings.project
+import com.bulifier.core.prefs.AppSettings.scope
 import com.bulifier.core.utils.readUntil
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.StringReader
 
 object SchemaModel {
-    const val KEY_PACKAGE = "package"
-    const val KEY_BULLETS_FILE_NAME = "bullets_file_name"
-    const val KEY_CONTEXT = "context"
-    const val KEY_PROMPT = "prompt"
-    const val KEY_MAIN_FILE = "main_file"
-    const val KEY_MAIN_FILE_NAME = "main_file_name"
+    const val KEY_PROJECT_NAME = "project_name"
     const val KEY_PROJECT_DETAILS = "project_details"
     const val KEY_SCHEMAS = "schemas"
-    const val KEY_FOLDER_NAME = "folder_name"
     const val KEY_FILES = "files"
-    const val KEY_PROJECT_NAME = "project_name"
-    const val KEY_BULLET_RAW_FILE_PAIR = "bullet_raw_file_pair"
+    const val KEY_MAIN_FILE_NAME = "main_file_name"
+    const val KEY_MAIN_FILE = "main_file"
+    const val KEY_PROMPT = "prompt"
+    const val KEY_FILES_FOR_CONTEXT = "files_for_context"
+    const val KEY_FILES_TO_UPDATE = "files_to_update"
+    const val KEY_FILES_TO_CREATE = "files_to_create"
+    const val KEY_FILES_LIST = "files_list"
+    const val KEY_BULLETS_FOR_CONTEXT = "bullets_for_context"
+    const val KEY_BULLETS_TO_UPDATE = "bullets_to_update"
+
 
     private val keys = setOf(
-        KEY_PACKAGE,
-        KEY_CONTEXT,
         KEY_PROMPT,
         KEY_MAIN_FILE,
         KEY_MAIN_FILE_NAME,
+        KEY_PROJECT_NAME,
         KEY_PROJECT_DETAILS,
         KEY_SCHEMAS,
-        KEY_FOLDER_NAME,
         KEY_FILES,
-        KEY_PROJECT_NAME,
-        KEY_BULLET_RAW_FILE_PAIR,
-        KEY_BULLETS_FILE_NAME
+        KEY_FILES_FOR_CONTEXT,
+        KEY_FILES_TO_UPDATE,
+        KEY_FILES_TO_CREATE,
+        KEY_FILES_LIST,
+        KEY_BULLETS_FOR_CONTEXT,
+        KEY_BULLETS_TO_UPDATE,
     )
 
-    private val job = Job()
-    private val scope = CoroutineScope(Dispatchers.Default + job)
     private lateinit var db: AppDatabase
     private lateinit var appContext: Context
 
@@ -59,51 +61,40 @@ object SchemaModel {
         this.appContext = appContext
 
         scope.launch {
-            Prefs.projectId.flow.collectLatest {
-                if (it != -1L) {
-                    verifySchemas(it)
+            project.collectLatest {
+                if (it.projectId != -1L) {
+                    verify(it)
                 }
             }
         }
     }
 
-    fun verifySchemasRequest(projectId: Long) {
-        scope.launch {
-            verifySchemas(Prefs.projectId.flow.value)
-            reloadSchemas(projectId)
+    suspend fun verify(project: Project) {
+        if (db.fileDao().getProject(project.projectId) == null) {
+            AppSettings.clear()
+            return
         }
-    }
-
-    private suspend fun verifySchemas(projectId: Long) {
-        withContext(Dispatchers.IO) {
-            if (!db.fileDao().isPathExists("schemas", projectId)) {
-                createDefaultSchemas(projectId)
-            } else {
-                reloadSchemas(projectId)
-            }
+        if (!db.fileDao().isPathExists("schemas", project.projectId)) {
+            loadSystemDefaults(project)
         }
+        reloadSchemas(project)
+        AppSettings.reloadSettings()
     }
 
-    private suspend fun createDefaultSchemas(projectId: Long) {
-        loadSystemDefaults(projectId)
-        reloadSchemas(projectId)
-    }
-
-    private suspend fun loadSystemDefaults(projectId: Long) {
+    private suspend fun loadSystemDefaults(project: Project) {
         db.fileDao().insertFile(
             File(
                 path = "",
                 fileName = "schemas",
                 isFile = false,
-                projectId = projectId
+                projectId = project.projectId
             )
         )
-        resetSystemSchemas(projectId)
+        resetSystemSchemas(project)
     }
 
-    suspend fun resetSystemSchemas(projectId: Long) {
+    suspend fun resetSystemSchemas(project: Project) {
         withContext(Dispatchers.IO) {
-            val project = db.fileDao().getProjectById(projectId)
             var schemasPath = "schemas/"
             if (project.template != null) {
                 val assetsPath = "templates/${project.template}/schemas/"
@@ -119,14 +110,14 @@ object SchemaModel {
                             path = "schemas",
                             fileName = fileName,
                             isFile = true,
-                            projectId = projectId
+                            projectId = project.projectId
                         )
                     ).run {
                         if (this == -1L) {
                             db.fileDao().getFileId(
                                 path = "schemas",
                                 fileName = fileName,
-                                projectId = projectId
+                                projectId = project.projectId
                             ) ?: return@withContext
                         } else {
                             this
@@ -145,21 +136,21 @@ object SchemaModel {
         }
     }
 
-    suspend fun reloadSchemas(projectId: Long): Boolean {
+    suspend fun reloadSchemas(project: Project): Boolean {
         return withContext(Dispatchers.IO) {
-            var schemas = db.fileDao().loadFilesByPath("schemas", projectId).map {
+            var schemas = db.fileDao().loadFilesByPath("schemas", project.projectId).map {
                 parseSchema(
-                    it.content, it.fileName.substringBeforeLast("."), projectId
+                    it.content, it.fileName.substringBeforeLast("."), project.projectId
                 )
             }.flatten()
-            reloadSchemas(schemas, projectId)
+            reloadSchemas(schemas, project)
             true
         }
     }
 
     private suspend fun reloadSchemas(
         schemas: List<Schema>,
-        projectId: Long
+        project: Project
     ) {
         schemas.run {
             val settings = filter { it.type == SchemaType.SETTINGS }.map {
@@ -175,16 +166,12 @@ object SchemaModel {
                 }
                 SchemaSettings(
                     schemaName = it.schemaName,
-                    inputExtension = map["input extension"] ?: "bul",
-                    processingMode = map["processing mode"]?.let {
-                        ProcessingMode.fromString(it)
-                    } ?: ProcessingMode.SINGLE,
                     multiFilesOutput = map["multi files output"] == "true",
-                    overrideFiles = map["override files"] == "true",
+                    multiRawFilesOutput = map["multi raw files output"] == "true",
                     visibleForAgent = map["visible for agent"] == "true",
                     isAgent = map["agent"] == "true",
                     purpose = map["purpose"] ?: "TBA",
-                    projectId = projectId
+                    projectId = project.projectId
                 )
             }
             db.schemaDao()
@@ -193,10 +180,10 @@ object SchemaModel {
     }
 
     suspend fun getSchemaNames() =
-        db.schemaDao().getSchemaNames(projectId = Prefs.projectId.flow.value)
+        db.schemaDao().getSchemaNames(projectId = project.value.projectId)
 
     suspend fun getSchemaPurposes() =
-        db.schemaDao().getSchemaPurposes(projectId = Prefs.projectId.flow.value)
+        db.schemaDao().getSchemaPurposes(projectId = project.value.projectId)
 
     private fun parseSchema(content: String, schemaName: String, projectId: Long): List<Schema> {
         val pattern = """^\s*#\s*[0-9a-zA-Z_\-]+""".toRegex(RegexOption.MULTILINE)
@@ -230,7 +217,7 @@ object SchemaModel {
 
             val keys = extractKeys(sections[index])
             if (!SchemaModel.keys.containsAll(keys)) {
-                throw IllegalArgumentException("Schema error - Invalid keys: [${keys.joinToString()}]")
+                Log.d("SchemaModel", "Schema error - Invalid keys: [${keys.joinToString()}]")
             }
 
             Schema(
@@ -260,7 +247,14 @@ object SchemaModel {
             if (ch.toChar() == '⟪') {
                 val token = reader.readUntil('⟫')
                 if (!token.contains('\n')) {
-                    keys.add(token)
+                    keys.add(token.trim())
+                } else {
+                    keys.addAll(token.substringBefore("/n")
+                        .split("and")
+                        .map {
+                            it.split("=").first().trim()
+                        }
+                    )
                 }
             }
         }

@@ -29,4 +29,9 @@
         android:id="@+id/clear"
         android:icon="@drawable/baseline_delete_forever_24"
         android:title="Hard Reset &amp; Clean" />
+
+    <item
+        android:id="@+id/autoCommit"
+        android:icon="@drawable/baseline_auto_mode_24"
+        android:title="Auto Commit - ON" />
 </menu>

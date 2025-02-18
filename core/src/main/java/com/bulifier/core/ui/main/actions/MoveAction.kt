@@ -62,13 +62,12 @@ private suspend fun moveFile(
 suspend fun deleteAction(file: File, db: FileDao, logger: Logger) {
     logger.d("Deleting file: ${file.path}/${file.fileName}")
     if (file.isFile) {
-        listOf(file, getAssociatedFile(file, db, logger)).filterNotNull().forEach{
+        listOf(file, getAssociatedFile(file, db, logger)).filterNotNull().forEach {
             db.deleteFile(it.fileId)
             logger.d("File deleted: ${it.path}/${it.fileName}")
         }
     } else {
-        val fullPath = if (file.path.isEmpty()) file.fileName else "${file.path}/${file.fileName}"
-        db.deleteFolder(file.fileId, fullPath, file.projectId)
+        db.deleteFolder(file.fileId, file.fullPath, file.projectId)
         logger.d("Folder deleted: ${file.fileName}")
     }
 }
@@ -76,7 +75,7 @@ suspend fun deleteAction(file: File, db: FileDao, logger: Logger) {
 suspend fun markForDeleteAction(file: File, db: FileDao, logger: Logger) {
     logger.d("Marking for deletion: ${file.path}/${file.fileName}")
     if (file.isFile) {
-        listOf(file, getAssociatedFile(file, db, logger)).filterNotNull().forEach{
+        listOf(file, getAssociatedFile(file, db, logger)).filterNotNull().forEach {
             db.markForDeleteAction(it.fileId)
             logger.d("File deleted: ${it.path}/${it.fileName}")
         }

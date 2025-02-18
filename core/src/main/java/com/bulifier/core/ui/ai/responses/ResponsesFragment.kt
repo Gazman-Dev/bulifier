@@ -7,7 +7,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.Toast
 import androidx.core.view.isVisible
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
@@ -15,6 +14,7 @@ import com.bulifier.core.databinding.ResponsesFragmentBinding
 import com.bulifier.core.navigation.findNavController
 import com.bulifier.core.ui.ai.HistoryViewModel
 import com.bulifier.core.ui.core.BaseFragment
+import com.bulifier.core.utils.showToast
 import kotlinx.coroutines.launch
 
 class ResponsesFragment : BaseFragment<ResponsesFragmentBinding>() {
@@ -42,7 +42,7 @@ class ResponsesFragment : BaseFragment<ResponsesFragmentBinding>() {
             val message = errorMessage ?: adapter?.getContent(binding.viewPager.currentItem)
             ?: return@setOnClickListener
             copyTextToClipboard(message)
-            Toast.makeText(requireContext(), "Copied to clipboard", Toast.LENGTH_SHORT).show()
+            showToast("Copied to clipboard")
         }
 
         viewLifecycleOwner.lifecycleScope.launch {

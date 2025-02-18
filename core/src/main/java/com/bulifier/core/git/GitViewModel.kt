@@ -7,8 +7,9 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.cachedIn
 import com.bulifier.core.db.db
-import com.bulifier.core.prefs.Prefs.projectId
-import com.bulifier.core.prefs.Prefs.projectName
+import com.bulifier.core.prefs.AppSettings
+import com.bulifier.core.prefs.AppSettings.project
+import com.bulifier.core.prefs.PrefBooleanValue
 import com.bulifier.core.schemas.SchemaModel
 import com.bulifier.core.utils.Logger
 import kotlinx.coroutines.Dispatchers
@@ -26,9 +27,10 @@ import java.io.File
 
 class GitViewModel(val app: Application) : AndroidViewModel(app) {
     private val repoDir: File
-        get() = File(app.filesDir, projectName.flow.value)
+        get() = File(app.filesDir, project.value.projectName)
     private val credentials = SecureCredentialManager(app)
     private val db by lazy { app.db.fileDao() }
+    val autoCommit = PrefBooleanValue("autoCommit", true)
 
     val gitStatus: StateFlow<GitStatus> = MutableStateFlow(GitStatus.IDLE)
 
@@ -52,10 +54,9 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val commits = projectName
-        .flow.flatMapLatest { project ->
-            getCommitsPager(File(app.filesDir, project))
-        }
+    val commits = project.flatMapLatest { project ->
+        getCommitsPager(File(app.filesDir, project.projectName))
+    }
         .cachedIn(viewModelScope)
 
     private fun getCommitsPager(repoDir: File) = Pager(
@@ -76,7 +77,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
                 updateBranch()
                 setGitStatus(GitStatus.IDLE)
             } catch (e: Exception) {
-                e.printStackTrace()
+                AppSettings.appLogger.e(e)
                 "Git: Error " + e.message
             }
         }
@@ -140,47 +141,24 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     fun clone(repoUrl: String, username: String, passwordToken: String) {
         viewModelScope.launch {
             setGitStatus(GitStatus.PROCESSING)
-            credentials.saveCredentials(projectId.flow.value, username, passwordToken)
+            credentials.saveCredentials(project.value.projectId, username, passwordToken)
             val creds = fetchCredentials() ?: return@launch
 
             try {
-                val backupDir = File(app.filesDir, "backup")
-                backupFiles(repoDir, backupDir)
-
                 repoDir.deleteRecursively()
                 GitHelper.clone(repoDir, creds, repoUrl)
-                restoreBackup(backupDir, repoDir)
-                backupDir.deleteRecursively()
-                backupDir.delete()
 
                 syncDbToLocal(false) // override repo with project files
                 syncLocalToDb() // load all the files into the db
 
-                SchemaModel.verifySchemasRequest(projectId.flow.value)
+                AppSettings.scope.launch {
+                    SchemaModel.verify(project.value)
+                }
 
                 resetGit(true)
             } catch (e: Exception) {
                 reportError(e, "Clone")
             }
-        }
-    }
-
-    private fun backupFiles(repoDir: File, backupDir: File) {
-        if (!repoDir.exists()) return
-
-        backupDir.mkdirs()
-        backupDir.deleteRecursively()
-
-        repoDir.listFiles()?.forEach { file ->
-            val target = File(backupDir, file.name)
-            file.copyRecursively(target, overwrite = true)
-        }
-    }
-
-    private fun restoreBackup(backupDir: File, repoDir: File) {
-        backupDir.listFiles()?.forEach { file ->
-            val target = File(repoDir, file.name)
-            file.copyRecursively(target, overwrite = true)
         }
     }
 
@@ -223,11 +201,11 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun syncDbToLocal(clearOldFiles: Boolean = true) {
-        db.dbToLocal(app, projectId.flow.value, clearOldFiles)
+        db.dbToLocal(app, project.value.projectId, clearOldFiles)
     }
 
     private suspend fun syncLocalToDb() {
-        db.localToDb(app, projectId.flow.value)
+        db.localToDb(app, project.value.projectId)
     }
 
     private suspend fun reportError(
@@ -247,7 +225,7 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun fetchCredentials(): CredentialsProvider? {
-        return credentials.retrieveCredentials(projectId.flow.value).apply {
+        return credentials.retrieveCredentials(project.value.projectId).apply {
             if (this == null) {
                 this@GitViewModel.setGitStatus(GitStatus.PROCESSING)
             }
@@ -257,18 +235,18 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     suspend fun getBranches() = try {
         GitHelper.branches(repoDir)
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppSettings.appLogger.e(e)
         emptyList()
     }
 
     suspend fun getTags() = try {
         GitHelper.tags(repoDir)
     } catch (e: Exception) {
-        e.printStackTrace()
+        AppSettings.appLogger.e(e)
         emptyList()
     }
 
-    suspend fun getCredentials() = credentials.retrieveCredentials(projectId.flow.value)
+    suspend fun getCredentials() = credentials.retrieveCredentials(project.value.projectId)
     fun deleteProject(projectName: String) {
         viewModelScope.launch {
             withContext(Dispatchers.IO) {
@@ -306,6 +284,12 @@ class GitViewModel(val app: Application) : AndroidViewModel(app) {
     }
 
     fun isCloneNeeded() = GitHelper.isCloneNeeded(repoDir)
+
+    fun toggleAutoCommit() {
+        autoCommit.set(!autoCommit.flow.value)
+    }
+
+    fun autoCommit() = autoCommit.flow.value && !isCloneNeeded()
 }
 
 data class GitError(

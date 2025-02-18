@@ -20,6 +20,7 @@ import com.bulifier.core.git.GitViewModel
 import com.bulifier.core.git.ui.CommitsDialogFragment
 import com.bulifier.core.ui.main.CheckoutDialogManager
 import com.bulifier.core.ui.main.MainViewModel
+import com.bulifier.core.utils.showToast
 import kotlinx.coroutines.launch
 import org.eclipse.jgit.transport.CredentialItem
 import org.eclipse.jgit.transport.URIish
@@ -55,6 +56,12 @@ class GitUiHelper(
         PopupMenu(gitButton.context, gitButton).apply {
             inflate(R.menu.git_menu)
 
+            menu.findItem(R.id.autoCommit).title = if (gitViewModel.autoCommit.flow.value) {
+                "Auto Commit - ON"
+            } else {
+                "Auto Commit - OFF"
+            }
+
             val isCloneNeeded = gitViewModel.isCloneNeeded()
             menu.forEach {
                 it.isEnabled = !isCloneNeeded || it.itemId == R.id.clone
@@ -70,12 +77,23 @@ class GitUiHelper(
                     R.id.push -> gitViewModel.push()
                     R.id.commit -> commit()
                     R.id.clear -> clear()
+                    R.id.autoCommit -> toggleAutoCommit()
                     else -> Unit
                 }
                 true
             }
             show()
         }
+    }
+
+    private fun toggleAutoCommit() {
+        gitViewModel.toggleAutoCommit()
+        val status = if (gitViewModel.autoCommit.flow.value) {
+            "ON"
+        } else {
+            "OFF"
+        }
+        showToast("Auto commit is $status")
     }
 
     private fun revert() {

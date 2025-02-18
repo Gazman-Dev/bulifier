@@ -39,7 +39,7 @@ File Structure
 - assets: Directory for binary files (e.g., images, fonts).
 - css: Directory for style files (e.g., CSS stylesheets).
 - js: Directory for JavaScript code files.
-- index.html: The main HTML file located in the root directory.
+- index.html: The main HTML file located in the root directory, make sure to add <!-- Vendor libraries --> comment in the body, it is used by the tool
 
 ---
 
@@ -195,19 +195,14 @@ Note that in this example both files are in the root folder.
 
 ---
 
-# System-loop
-Read the below file, it is for context only.
-
-⟪context⟫
-
----
-
-Remember this file is for context only.
-
-# System
 In summary, remember:
  - Use full path file names, in both imports and the FileName field.
  - Use human language to describe methods logic so developers can understand. Be brief.
 
 # User
 ⟪prompt⟫
+
+⟪files_for_context = exists
+Relevant project files - You might need to add update those as well as adding new files:
+⟪files_for_context⟫
+⟫

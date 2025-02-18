@@ -9,7 +9,8 @@ import androidx.room.ColumnInfo
 import androidx.room.Embedded
 import androidx.room.Room
 import androidx.room.RoomDatabase
-import com.bulifier.core.db.Content.Type
+import com.bulifier.core.db.migrations.MIGRATIONS
+import com.bulifier.core.utils.fullPath
 import java.util.concurrent.Executors
 import java.util.zip.Adler32
 
@@ -51,7 +52,7 @@ data class HistoryItemWithSelection(
 )
 
 @Keep
-enum class SyncMode{
+enum class SyncMode {
     BULLET,
     RAW,
     AUTO
@@ -72,13 +73,6 @@ data class FileData(
 
     @ColumnInfo(name = "content")
     val content: String = "",
-
-    @Deprecated("not used anymore")
-    @ColumnInfo(name = "type")
-    val type: Type = Type.NONE,
 ) {
-    fun toContent() = Content(
-        fileId = fileId,
-        content = content
-    )
+    val fullPath get() = fullPath(path, fileName)
 }

@@ -10,7 +10,7 @@ fun View.hideKeyboard() {
     inputMethodManager.hideSoftInputFromWindow(windowToken, 0)
 }
 
-fun <A : Any?, B : Any?, C : Any?> letAll(a: A?, b: B?, block: (A, B) -> C) : C? {
+fun <A : Any?, B : Any?, C : Any?> letAll(a: A?, b: B?, block: (A, B) -> C): C? {
     if (a == null || b == null) {
         return null
     }
@@ -49,7 +49,17 @@ fun getFileType(fileName: String): FileType {
 
     return when (extension) {
         // Image extensions (compatible with Glide and typical image formats)
-        in setOf("jpg", "jpeg", "png", "gif", "webp", "bmp", "ico", "heic", "heif") -> FileType.IMAGE
+        in setOf(
+            "jpg",
+            "jpeg",
+            "png",
+            "gif",
+            "webp",
+            "bmp",
+            "ico",
+            "heic",
+            "heif"
+        ) -> FileType.IMAGE
 
         // Video extensions
         in setOf("mp4", "mkv", "avi", "webm", "mov", "3gp") -> FileType.VIDEO
