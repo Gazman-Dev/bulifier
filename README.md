@@ -1,3 +1,23 @@
+# Update
+
+I'm putting the open source on pause.
+
+- I moved away from Bullet Points
+   - After months of experimentation, I came to the conclusion that Bullet Points are too granular an abstraction.
+   - AI performs better with as few constraints as possible.
+     - Just like people, it's hard to teach an old wolf new tricks.
+     - In other words, it's more effective to adapt your business to AI than to force AI to adapt to your business.
+
+- I’ve fully migrated to Compose and rebuilt the entire UI from the ground up.
+   - The schema mechanism and Git integration remain unchanged.
+
+So yeah, the whole concept of Bulifier has evolved—but the mission hasn't, and neither has the name. Bulifier is still here for the big game. Open source will return. This is just a pause :)
+
+👉 Visit the Vibe Store – https://bulifier.com
+📱 Check out the latest release on the Play Store – https://play.google.com/store/apps/details?id=com.bulifier
+
+-----------------------------------------------------------------------------------------
+
 # Welcome to Bulifier
 
 [![Watch the Demo](https://img.shields.io/badge/Watch-Demo-red)](https://www.youtube.com/watch?v=ZZbraX6OFMg&ab_channel=Bulifier)  
