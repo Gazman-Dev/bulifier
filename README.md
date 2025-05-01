@@ -13,7 +13,7 @@ I'm putting the open source on pause.
 
 So yeah, the whole concept of Bulifier has evolved—but the mission hasn't, and neither has the name. Bulifier is still here for the big game. Open source will return. This is just a pause :)
 
-👉 Visit the Vibe Store – https://bulifier.com
+👉 Visit the Vibe Store – https://bulifier.com<br>
 📱 Check out the latest release on the Play Store – https://play.google.com/store/apps/details?id=com.bulifier
 
 -----------------------------------------------------------------------------------------
